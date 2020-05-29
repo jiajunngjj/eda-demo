@@ -2,6 +2,9 @@
 
 Basic UI function to capture a simple food order 
 
+![sample][./ui.png]
+
+
 Payload ready to be sent to backend server
 
 ```
