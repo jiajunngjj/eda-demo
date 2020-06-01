@@ -8,11 +8,20 @@ var App = {
         $.each($('#form1').serializeArray(), function() {
             formData[this.name] = this.value;
         });
-        formData["orderId"] = "order-"+Math.floor(Math.random() * 100000000)+"-"+formData["email"];
+        formData["id"] = "order-"+Math.floor(Math.random() * 100000000)+"-"+formData["email"];
         console.log(JSON.stringify(formData));   
         //alert(JSON.stringify(formData));
 
         //submit form
+        $.ajax({
+            method: "POST",
+            url: "./submit",
+            data: formData
+          })
+            .done(function( msg ) {
+              console.log( "received: " + msg );
+              $('#response').html("Order submitted: "+msg);
+            });        
 
     }
 };
