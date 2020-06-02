@@ -10,6 +10,7 @@ public class Order {
     String address;
     String email;
     Integer qty;
+    String status;
     /**
     Product product;
     Customer customer;

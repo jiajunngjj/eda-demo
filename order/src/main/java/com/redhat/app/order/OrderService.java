@@ -19,16 +19,23 @@ public class OrderService {
     @Channel("new-order")    
     Emitter<String> emitter;
     
+    Gson gson = new Gson();
+
     @Incoming("inventory-completed")
     public String process(String json) {
         log.info("Inventory done for "+json);
         return json;
     }
 
-
+    @Incoming("order-error")
+    public String processError(String json) {
+        Order order = gson.fromJson(json, Order.class);
+        log.info("Error  "+order.getStatus());
+        return json;
+    }
     public Order newOrder(Order order) {
         log.info("Order "+order);
-        Gson gson = new Gson();
+        
         String json = gson.toJson(order);
         emitter.send(json);
         return order;
