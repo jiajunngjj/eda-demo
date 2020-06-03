@@ -7,6 +7,7 @@ const  http = require('http');
 router.get('/', function(req, res, next) {
   res.render('index.html', { title: 'Express' });
 });
+
 router.post('/submit', function(req, res, next) {
   console.log(req.body);
   console.log(req.body.orderId);

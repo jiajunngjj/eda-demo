@@ -21,7 +21,9 @@ var App = {
             .done(function( msg ) {
               console.log( "received: " + msg );
               $('#response').html("Order submitted: "+msg);
+              //$('#status').html("Order submitted: "+msg);
             });        
 
-    }
+    },
+
 };
