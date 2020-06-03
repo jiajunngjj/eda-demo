@@ -13,8 +13,8 @@ router.post('/submit', function(req, res, next) {
   console.log(req.body.orderId);
 
   var post_options = {
-      host: "192.168.0.110",
-      port: "8080",
+      host: process.env.BACKEND_URL || "192.168.0.110",
+      port: process.env.BACKEND_PORT || "8080",
       path: "/rest/orders/submit",
       method: "POST",
       headers: {

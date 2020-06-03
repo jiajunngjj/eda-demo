@@ -18,7 +18,7 @@ public class StartUpBean {
     
     List<Inventory> list = new ArrayList<Inventory>();
     void onStart(@Observes StartupEvent ev) {               
-        log.info("The application is starting...");
+        log.info("The application is starting...Creating records");
         //create new inventory
         Inventory inv1 = new Inventory();
 
@@ -47,7 +47,6 @@ public class StartUpBean {
         inv3.setPrice(Double.valueOf(3.5));
         list.add(inv3);
         inv3.persist();
-
     }
 
     void onStop(@Observes ShutdownEvent ev) {               

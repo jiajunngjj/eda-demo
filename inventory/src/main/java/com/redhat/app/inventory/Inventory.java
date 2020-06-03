@@ -13,5 +13,4 @@ public class Inventory extends PanacheMongoEntity{
     Double price;
     Integer stock;
     
-
 }

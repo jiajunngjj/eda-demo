@@ -1,20 +1,14 @@
 package com.redhat.app.inventory;
 
-import java.util.List;
-
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
-
 import com.google.gson.Gson;
-
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import io.quarkus.mongodb.panache.PanacheQuery;
 
 @ApplicationScoped
 public class InventoryService {
@@ -32,33 +26,29 @@ public class InventoryService {
     String injectedError;
 
     Logger log = LoggerFactory.getLogger(this.getClass());
+
     @Incoming("new-order")
     public Order process(String json) {
         //simulate processing inventory
         Order order = gson.fromJson(json, Order.class);   
         log.info("Order "+order.getId());
         try {
-            
             this.updateInventory(order);
-            
+            json = gson.toJson(order);
+                Thread.sleep(3000);
+                //simulate delay in processing
+                emitter.send(json);
+    
+           
 		} catch (InventoryException e) {
             //e.printStackTrace();
             log.info("Inventory Error captured "+e.getMessage());
-            order.setStatus("INVENTORY_ERROR");         
+            order.setStatus(e.getMessage());         
             json = gson.toJson(order);
             errorEmitter.send(json);
-		}
-        json = gson.toJson(order);
-        try {
-            Thread.sleep(3000);
-            //simulate delay in processing
-            emitter.send(json);
-
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-        
+            e.printStackTrace();
+        } 
 
         return order;
     }
@@ -67,19 +57,17 @@ public class InventoryService {
     public Order processError(String json) {
         //ignore event sent out by myself
         Order order = gson.fromJson(json, Order.class);
-        if (order.getStatus().equals("INVENTORY_ERROR")) {
+        if (order.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
             return order;
-        }        
+        }
+        
         //dirty hack - simple scenario, add back the reduced qty
-        try {
-            log.info("detected Error in order txn: "+order.getId()+" , reverting inventory");
-            order.setQty(order.getQty()*(-1));
-			this.updateInventory(order);
-		} catch (InventoryException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-        order.setStatus("revert inventory");
+        log.info("detected Error in order txn: "+order.getId()+" , reverting inventory");
+        //order.setQty(order.getQty()*(-1));
+        Inventory i =Inventory.findById(order.getProduct());
+        i.setStock(i.getStock()+order.getQty());
+        i.update();
+        order.setStatus("INVENTORY_REVERTED");
         return  order;
     }   
     private Order updateInventory(Order order) throws InventoryException{
@@ -87,21 +75,15 @@ public class InventoryService {
         log.info("find by id "+i);
         if (i !=null ) {
             if ( (i.getStock().intValue() < order.getQty().intValue())) {
-                order.setStatus("INVENTORY_ERROR");
-                String json = gson.toJson(order);
-                errorEmitter.send(json);
-                throw new InventoryException("Insufficient Stock");
+                order.setStatus("INVENTORY_INSUFFICIENT_STOCK");
 
+                String json = gson.toJson(order);
+                //errorEmitter.send(json);
+                throw new InventoryException("INVENTORY_INSUFFICIENT_STOCK");
             }
             i.setStock(Integer.valueOf(i.getStock().intValue() - order.getQty().intValue()));
             i.update();
         }
-        //testing
-        //PanacheQuery<Inventory> inventoryQuery = Inventory.find("name", order.getProduct());
-        //List<Inventory> results = inventoryQuery.list();
-        //log.info("results "+results.size());
-        //Inventory inv = results.get(0);
-        //inv.update("stock", inv.stock - order.getQty() );
         order.setStatus("INVENTORY_UPDATED");
         return order;
     }

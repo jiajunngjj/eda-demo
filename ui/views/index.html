@@ -7,8 +7,7 @@
     <meta name="description" content="">
     <meta name="author" content="Mark Otto, Jacob Thornton, and Bootstrap contributors">
     <meta name="generator" content="Jekyll v3.8.5">
-    <title>Starter Template · Bootstrap</title>
-
+    <title>Demo </title>
     <link rel="canonical" href="https://getbootstrap.com/docs/4.3/examples/starter-template/">
 
     <!-- Bootstrap core CSS -->
@@ -76,7 +75,15 @@
     <h1>Food Online</h1>
 <!---->
 <div class="row justify-content-md-center">
-  <div class="col col-lg-2">&nbsp;</div>
+  <div class="col col-lg-6">
+    <div id="title">Order Status:</div>
+  </hr>
+    <div style="text-align: left;" id="status0"></div>
+    <div style="text-align: left;" id="status1"></div>
+    <div style="text-align: left;" id="status2"></div>
+    <div style="text-align: left;" id="status3"></div>
+    <div  style="text-align: left;" id="status4"></div>
+  </div>
   <div class="col-md-auto">
 
     <form id="form1">
@@ -104,10 +111,11 @@
       <button type="button" class="btn btn-primary" onClick="App.clickSubmit();">Submit</button>
     </form>
   </div>
+<!--
   <div class="col col-lg-2">&nbsp;</div>
+  -->
 </div>
 <div id="response"></div>
-<div id="status"></div>
 
 
 
@@ -115,15 +123,6 @@
   </div>
 
 </main><!-- /.container -->
-<script>
-    var source = new EventSource("http://192.168.0.110:8080/rest/orders/status");
-console.log(source);
-source.onmessage = function (event) {
-  console.log("event");
-        document.getElementById("status").innerHTML = event.data;
-    }; 
-
-</script>
 	<script src="js/jquery-3.4.1.min.js" crossorigin="anonymous"></script>
       <script>window.jQuery || document.write('<script src="js/jquery-3.4.1.min.js"><\/script>')</script><script src="js/bootstrap.bundle.min.js"  crossorigin="anonymous">
      </script>
@@ -133,7 +132,21 @@ source.onmessage = function (event) {
 $( document ).ready(function() {
     console.log( "ready!" );
     App.test("hello");
-   
+    var source = new EventSource("http://192.168.0.110:8080/rest/orders/status");
+  console.log(source);
+  var updates=["","",""];
+  var cnt=0;
+  source.onmessage = function (event) {
+       console.log(cnt+ " event");
+      //move down
+      $("#status4").html($("#status3").html());
+      $("#status3").html($("#status2").html());
+      $("#status2").html($("#status1").html());
+       $("#status1").html($("#status0").html());
+       $("#status0").html(event.data);
+
+
+  };    
 });
 
 	</script>
