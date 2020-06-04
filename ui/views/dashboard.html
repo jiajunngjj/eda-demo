@@ -76,9 +76,8 @@
 <!---->
 <div class="row justify-content-md-center">
   <div class="col col-lg-2">&nbsp;</div>
- <!--
-  <div class="col col-lg-6">
-    
+  <div class="col-md-auto">
+
     <div id="title">Order Status:</div>
   </hr>
     <div style="text-align: left;" id="status0"></div>
@@ -86,38 +85,9 @@
     <div style="text-align: left;" id="status2"></div>
     <div style="text-align: left;" id="status3"></div>
     <div  style="text-align: left;" id="status4"></div>
-  </div>
-  -->
-  <div class="col-md-auto">
 
-    <form id="form1">
-      <div class="form-group">
-      <select name="product" class="form-control" aria-describedby="itemsHelp">
-        <option value="">-- Select an option --</option>
-        <option value="Burger">Burger</option>
-        <option value="Pizza">Pizza</option>
-        <option value="Sushi">Sushi</option>
-      </select>
-    </div> 
-         
-    <div class="form-group">
-      <input name="qty" type="text" class="form-control" id="qtyInput" aria-describedby="qtyHelp" placeholder="Enter Qty">
-    </div>         
-      <div class="form-group">
-        <input name="customer" type="text" class="form-control" id="nameInput" aria-describedby="nameHelp" placeholder="Enter Name">
-      </div>
-      <div class="form-group">
-        <input name="email" type="email" class="form-control" id="emailInput" aria-describedby="emailHelp" placeholder="Enter Email">
-      </div>
-      <div class="form-group">
-        <input name="address" type="text" class="form-control" id="addressInput" aria-describedby="addressHelp" placeholder="Enter Delivery Address">
-      </div>
-      <button type="button" class="btn btn-primary" onClick="App.clickSubmit();">Submit</button>
-    </form>
   </div>
-<!--
   <div class="col col-lg-2">&nbsp;</div>
-  -->
 </div>
 <div id="response"></div>
 
@@ -136,13 +106,12 @@ $( document ).ready(function() {
     console.log( "ready!" );
     App.test("hello");
     //var source = new EventSource("/stream");
-    //var randomId=Math.floor(Math.random()*10000);
-   //  var source = new EventSource("http://<%=host%>/rest/orders/status/"+randomId);	
+    var randomId=Math.floor(Math.random()*10000);
+     var source = new EventSource("http://<%=host%>/rest/orders/status/"+randomId);	
     //var source = App.stream();
-    //console.log(source);
+    console.log(source);
   var updates=["","",""];
   var cnt=0;
-  /**
   source.onmessage = function (event) {
        console.log(cnt+ " event");
       //move down
@@ -151,7 +120,7 @@ $( document ).ready(function() {
       $("#status2").html($("#status1").html());
        $("#status1").html($("#status0").html());
        $("#status0").html(event.data);
-    */
+
 
   };    
 });

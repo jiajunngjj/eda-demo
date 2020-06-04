@@ -7,7 +7,9 @@ const  http = require('http');
 router.get('/', function(req, res, next) {
   res.render('index.html', { title: 'Express', host: process.env.URL });
 });
-
+router.get('/dashboard', function(req, res, next) {
+    res.render('dashboard.html', { host: process.env.URL });
+  });
 router.get('/stream', function(req,res,next){
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Content-Type', 'text/event-stream');
