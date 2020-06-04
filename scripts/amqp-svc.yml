@@ -1,0 +1,17 @@
+kind: Service
+apiVersion: v1
+metadata:
+ name: amqp-svc
+ namespace: eda-demo
+spec:
+ ports:
+   - name: amqp
+     protocol: TCP
+     port: 5671
+     targetPort: 5671
+ selector:
+   ActiveMQArtemis: ex-aao
+   application: ex-aao-app
+ type: ClusterIP
+ sessionAffinity: None
+ publishNotReadyAddresses: true
