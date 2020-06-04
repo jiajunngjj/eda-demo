@@ -113,7 +113,7 @@ public class OrderService {
 
     @Incoming("status-input")
     @Outgoing("status-stream")                          
-    @Broadcast                                           
+    //@Broadcast                                           
     public String updateStatus(String json) {
         log.info("status update called "+json);
         return json;

@@ -5,6 +5,7 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
@@ -42,11 +43,11 @@ public class OrderResource {
     }
 
     @GET
-    @Path("/orders/status")
+    @Path("/orders/status/{id}")
     @Produces(MediaType.SERVER_SENT_EVENTS)   
     @SseElementType("text/plain")
-    public Publisher<String> getStatus() {
-        log.info("Getting status update");
+    public Publisher<String> getStatus(@org.jboss.resteasy.annotations.jaxrs.PathParam String id) {
+        log.info("Getting status update "+id);
         return statusStream;
 
     }
