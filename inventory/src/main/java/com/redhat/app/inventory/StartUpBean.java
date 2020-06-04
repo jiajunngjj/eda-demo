@@ -19,7 +19,7 @@ public class StartUpBean {
     
     List<Inventory> list = new ArrayList<Inventory>();
     void onStart(@Observes StartupEvent ev) {               
-        log.info("The application is starting...Creating records");
+        log.info("The application is starting...Creating seed records if there is none");
         PanacheQuery<Inventory> q = Inventory.findAll();
         if (q.list().size() == 0 ) { 
             //create new inventory
@@ -54,7 +54,7 @@ public class StartUpBean {
     }
 
     void onStop(@Observes ShutdownEvent ev) {               
-        log.info("The application is stopping...");
+        log.info("The application is stopping...cleaning up seed record");
         for (Inventory inventory : list) {
             inventory.delete();
         }

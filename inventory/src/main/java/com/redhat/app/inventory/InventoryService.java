@@ -15,8 +15,8 @@ public class InventoryService {
     Gson gson = new Gson();
 
     @Inject
-    @Channel("inventory-completed")
-    Emitter<String> emitter;
+    @Channel("inventory-completed")//in-progress-order
+    Emitter<String> inprogressEmitter;
 
     @Inject
     @Channel("order-error")
@@ -33,11 +33,11 @@ public class InventoryService {
         Order order = gson.fromJson(json, Order.class);   
         log.info("Order "+order.getId());
         try {
-            this.updateInventory(order);
-            json = gson.toJson(order);
-                Thread.sleep(1000);
+                Thread.sleep(1500);
                 //simulate delay in processing
-                emitter.send(json);
+                this.updateInventory(order);
+                json = gson.toJson(order);
+                inprogressEmitter.send(json);
     
            
 		} catch (InventoryException e) {
@@ -53,6 +53,8 @@ public class InventoryService {
         return order;
     }
 
+    //receive errors related to inventory, for now only handle insufficient stock
+    //flow ends here, we may want to return a message to orderservice
     @Incoming("order-error-inv")
     public Order processError(String json) {
         //ignore event sent out by myself
@@ -70,6 +72,8 @@ public class InventoryService {
         order.setStatus("INVENTORY_REVERTED");
         return  order;
     }   
+    //to update inventory of stock, if qty ordered is higher, throw exception and return exp
+    // to calling method which is process(new order). a message will be returned to orderservice
     private Order updateInventory(Order order) throws InventoryException{
         Inventory i =Inventory.findById(order.getProduct());
         log.info("find by id "+i);

@@ -37,24 +37,28 @@ public class OrderService {
 
     List<Transaction> txList = new ArrayList<Transaction>();
 
-    @Incoming("inventory-completed")
+    @Incoming("inventory-completed")//in-progress-order
     public String process(String json) {
         
         log.info("Inventory done for "+json);
         Order order = gson.fromJson(json, Order.class);
         //simplified
+        //put logic to check if all the dependent services are completed.
+        // for now, after inventory check is done, we will mark as complete
         this.completeTransaction(order);
         return json;
     }
 
-    @Incoming("order-error")
+    @Incoming("order-error")//receive error from services
     public String processError(String json) {
         Order order = gson.fromJson(json, Order.class);
         log.info("Error  "+order.getStatus());
         //call downstreams services to handle erros also
         //order.setStatus("FROM_ORDER_ERROR");
         json = gson.toJson(order);
-        //inventory Service
+        //consolidate all error messages, and send to individual queues, 
+        // crude, can be refined
+        //check that this is a inventory related error, send back to inv-error queue
         if (order.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
             invErrorEmitter.send(json);
         }
@@ -68,10 +72,14 @@ public class OrderService {
         Transaction tx = Transaction.findById(order.getId());
         tx.setStatus("CANCELLED");
         tx.update();
+        //update screen status
         updateStreamStatus("Order Cancelled: "+order.getId()+" , Reason: "+order.getStatus());
     }
+
+    //called by cron job
     public void cancelStaleTransactions(Order order) {
         order.setStatus("CANCELLED");
+                //update screen status
         updateStreamStatus("Order Cancelled: "+order.getId()+" Reason: time out");
     }
 
@@ -95,11 +103,13 @@ public class OrderService {
         tx.setId(order.getId());
         tx.setOrder(order);        
         log.info("tx id: "+tx.getId());
+        //save a transaction record in mongodb, have a 10s job to check , 
+        //if record is not completed, will the job will cancel it
         tx.persist();
-        
+
         String json = gson.toJson(order);
         updateStreamStatus("Order Received:  "+order.getId()+" is being processed");
-        emitter.send(json);
+        emitter.send(json);//send to new-order queue
         //statusEmitter.send("test" + order.getId());
 
         //updateStatus();

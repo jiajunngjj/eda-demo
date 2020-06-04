@@ -35,6 +35,7 @@ public class OrderChecker {
         }
     }
 
+    //delete transaction records
     void onStop(@Observes ShutdownEvent ev) {               
         log.info("The application is stopping...");
         PanacheQuery<Transaction> q = Transaction.findAll();
