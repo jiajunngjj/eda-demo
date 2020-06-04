@@ -132,7 +132,8 @@ $( document ).ready(function() {
     console.log( "ready!" );
     App.test("hello");
     //var source = new EventSource("/stream");
-     var source = new EventSource("http://<%=host%>/rest/orders/status");	
+    var randomId=Math.floor(Math.random()*10000);
+     var source = new EventSource("http://<%=host%>/rest/orders/status/"+randomId);	
     //var source = App.stream();
     console.log(source);
   var updates=["","",""];
