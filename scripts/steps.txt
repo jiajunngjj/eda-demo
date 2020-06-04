@@ -1,3 +1,14 @@
+
+# deploy amq broker operator
+# create objects
+oc create -f scri[ts/
+
+# deploy mongodb
+oc new-app mongodb
+# already predefined with admin:admin]
+
+cd order
+
 mvn package
 oc new-build --binary --name=order -l app=order
 oc patch bc/order -p "{\"spec\":{\"strategy\":{\"dockerStrategy\":{\"dockerfilePath\":\"src/main/docker/Dockerfile.jvm\"}}}}"
@@ -8,6 +19,8 @@ oc new-app --image-stream=order:latest
 
 # To create the route
 oc expose service order
+
+cd inventory
 
 mvn package
 oc new-build --binary --name=inventory -l app=inventory
@@ -20,5 +33,12 @@ oc new-app --image-stream=inventory:latest
 # To create the route
 oc expose service inventory
 
+# Starting the inventory svc instantiate some records in mongodb
 
-oc new-app nodejs~https://github.com/jiajunngjj/eda-demo#dev1 --context-dir="/ui" --name=ui --env=BACKEND_URL=order.eda-demo.svc.cluster.local --env=BACKEND_PORT=8080
+
+
+oc new-app nodejs~https://github.com/jiajunngjj/eda-demo#dev1 --context-dir="/ui" --name=ui --env=BACKEND_URL=order.eda-demo.svc.cluster.local --env=BACKEND_PORT=8080 --env=host=<route of order service> 
+
+oc expose svc ui
+
+# there is dashboard page <ui route>/dashboard , that shows a real time update of the order status
