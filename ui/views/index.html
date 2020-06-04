@@ -132,7 +132,7 @@
 $( document ).ready(function() {
     console.log( "ready!" );
     App.test("hello");
-    var source = new EventSource("http://192.168.0.110:8080/rest/orders/status");
+    var source = new EventSource("http://<%host%>/rest/orders/status");
   console.log(source);
   var updates=["","",""];
   var cnt=0;

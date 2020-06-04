@@ -5,7 +5,7 @@ const  http = require('http');
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
-  res.render('index.html', { title: 'Express' });
+  res.render('index.html', { title: 'Express', host: process.env.URL });
 });
 
 router.post('/submit', function(req, res, next) {
