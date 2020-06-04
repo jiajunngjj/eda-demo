@@ -118,7 +118,6 @@
 <div id="response"></div>
 
 
-
 <!---->
   </div>
 
@@ -132,7 +131,8 @@
 $( document ).ready(function() {
     console.log( "ready!" );
     App.test("hello");
-    var source = new EventSource("/stream");
+    //var source = new EventSource("/stream");
+     var source = new EventSource("http://"+<%=URL%>+"/orders/status");	
     //var source = App.stream();
     console.log(source);
   var updates=["","",""];
