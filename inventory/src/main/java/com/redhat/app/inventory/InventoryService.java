@@ -35,7 +35,7 @@ public class InventoryService {
         try {
             this.updateInventory(order);
             json = gson.toJson(order);
-                Thread.sleep(3000);
+                Thread.sleep(1000);
                 //simulate delay in processing
                 emitter.send(json);
     

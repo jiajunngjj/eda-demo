@@ -24,6 +24,16 @@ var App = {
               //$('#status').html("Order submitted: "+msg);
             });        
 
-    },
+    }, stream:function() {
+            //submit form
+            $.ajax({
+              method: "GET",
+              url: "./stream"
+            })
+              .done(function( msg ) {
+                console.log( "received: " + msg );
+                return msg;
+              });  
+    }
 
 };

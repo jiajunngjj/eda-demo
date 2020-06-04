@@ -14,7 +14,7 @@ router.get('/stream', function(req,res,next){
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.flushHeaders(); // flush the headers to establish SSE with client
 
-    let interValID = setInterval(() => {
+    //let interValID = setInterval(() => {
         const options = {
             host: 'order-eda-demo.apps.cluster-sgp-ca65.sgp-ca65.example.opentlc.com',
             port: 80,
@@ -42,7 +42,7 @@ router.get('/stream', function(req,res,next){
           });
 
         //res.write(`data: ${JSON.stringify({num: counter})}\n\n`); // res.write() instead of res.send()
-    }, 1000);    
+   // }, 3000);    
 } );
 router.post('/submit', function(req, res, next) {
   console.log(req.body);
@@ -61,7 +61,7 @@ router.post('/submit', function(req, res, next) {
   var post_req = http.request(post_options, function(post_res) {
       post_res.setEncoding("utf8");
       post_res.on('data', function (chunk) {
-          console.log('Response: ' + chunk);
+          //console.log('Response: ' + chunk);
       });
       post_res.on('end', function () {
           res.send(req.body.id);
