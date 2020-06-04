@@ -8,7 +8,8 @@ var App = {
         $.each($('#form1').serializeArray(), function() {
             formData[this.name] = this.value;
         });
-        formData["id"] = "order-"+Math.floor(Math.random() * 100000000)+"-"+formData["email"];
+        //formData["id"] = "order-"+Math.floor(Math.random() * 100000000)+"-"+formData["email"];
+        formData["id"] = "ord-"+Math.floor(Math.random() * 10000);
         console.log(JSON.stringify(formData));   
         //alert(JSON.stringify(formData));
 
