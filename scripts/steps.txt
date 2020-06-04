@@ -1,0 +1,24 @@
+mvn package
+oc new-build --binary --name=order -l app=order
+oc patch bc/order -p "{\"spec\":{\"strategy\":{\"dockerStrategy\":{\"dockerfilePath\":\"src/main/docker/Dockerfile.jvm\"}}}}"
+oc start-build order --from-dir=. --follow
+
+# To instantiate the image
+oc new-app --image-stream=order:latest
+
+# To create the route
+oc expose service order
+
+mvn package
+oc new-build --binary --name=inventory -l app=inventory
+oc patch bc/inventory -p "{\"spec\":{\"strategy\":{\"dockerStrategy\":{\"dockerfilePath\":\"src/main/docker/Dockerfile.jvm\"}}}}"
+oc start-build inventory --from-dir=. --follow
+
+# To instantiate the image
+oc new-app --image-stream=inventory:latest
+
+# To create the route
+oc expose service inventory
+
+
+oc new-app nodejs~https://github.com/jiajunngjj/eda-demo#dev1 --context-dir="/ui" --name=ui --env=BACKEND_URL=order.eda-demo.svc.cluster.local --env=BACKEND_PORT=8080
