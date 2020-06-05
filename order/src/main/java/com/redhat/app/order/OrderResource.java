@@ -5,7 +5,6 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
@@ -14,6 +13,7 @@ import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.jboss.resteasy.annotations.SseElementType;
+import org.jboss.resteasy.annotations.jaxrs.PathParam;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +46,7 @@ public class OrderResource {
     @Path("/orders/status/{id}")
     @Produces(MediaType.SERVER_SENT_EVENTS)   
     @SseElementType("text/plain")
-    public Publisher<String> getStatus(@org.jboss.resteasy.annotations.jaxrs.PathParam String id) {
+    public Publisher<String> getStatus(@PathParam String id) {
         log.info("Getting status update "+id);
         return statusStream;
 

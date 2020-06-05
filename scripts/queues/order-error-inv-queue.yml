@@ -4,6 +4,6 @@ metadata:
   name: order-error-inv
   namespace: eda-demo
 spec:
-  addressName: order
-  queueName: error-order-inv
+  addressName: order-error-inv
+  queueName: order-error-inv
   routingType: anycast

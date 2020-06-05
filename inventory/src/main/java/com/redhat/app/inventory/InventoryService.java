@@ -15,7 +15,7 @@ public class InventoryService {
     Gson gson = new Gson();
 
     @Inject
-    @Channel("inventory-completed")//in-progress-order
+    @Channel("order-in-progress")//in-progress-order
     Emitter<String> inprogressEmitter;
 
     @Inject
@@ -27,16 +27,19 @@ public class InventoryService {
 
     Logger log = LoggerFactory.getLogger(this.getClass());
 
-    @Incoming("new-order")
+    @Incoming("order-new")
     public Order process(String json) {
         //simulate processing inventory
+        
         Order order = gson.fromJson(json, Order.class);   
-        log.info("Order "+order.getId());
+        log.info("Received new order "+order);
         try {
                 Thread.sleep(1500);
                 //simulate delay in processing
                 this.updateInventory(order);
                 json = gson.toJson(order);
+                log.info("Down updating inventory, sending to in progress emitter "+order);
+
                 inprogressEmitter.send(json);
     
            
@@ -77,6 +80,8 @@ public class InventoryService {
     private Order updateInventory(Order order) throws InventoryException{
         Inventory i =Inventory.findById(order.getProduct());
         log.info("find by id "+i);
+        log.info("Update inventory with order "+order+"| inv:"+i.getStock());
+
         if (i !=null ) {
             if ( (i.getStock().intValue() < order.getQty().intValue())) {
                 order.setStatus("INVENTORY_INSUFFICIENT_STOCK");
@@ -89,6 +94,7 @@ public class InventoryService {
             i.update();
         }
         order.setStatus("INVENTORY_UPDATED");
+        log.info("Updated inventory with order "+order+"| inv:"+i.getStock());
         return order;
     }
 }

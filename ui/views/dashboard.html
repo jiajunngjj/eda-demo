@@ -107,11 +107,12 @@ $( document ).ready(function() {
     App.test("hello");
     //var source = new EventSource("/stream");
     var randomId=Math.floor(Math.random()*10000);
-     var source = new EventSource("http://<%=host%>/rest/orders/status/"+randomId);	
+    var source = new EventSource("http://<%=host%>/rest/orders/status/"+randomId);	
     //var source = App.stream();
     console.log(source);
   var updates=["","",""];
   var cnt=0;
+  
   source.onmessage = function (event) {
        console.log(cnt+ " event");
       //move down
@@ -120,9 +121,11 @@ $( document ).ready(function() {
       $("#status2").html($("#status1").html());
        $("#status1").html($("#status0").html());
        $("#status0").html(event.data);
-
-
-  };    
+    };
+source.onerror = function(error) {
+    console.log("error!"+error.message);
+    source = new EventSource("http://<%=host%>/rest/orders/status/"+randomId);	
+ } ; //error        
 });
 
 	</script>

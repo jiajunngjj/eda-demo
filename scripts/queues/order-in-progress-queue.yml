@@ -4,6 +4,6 @@ metadata:
   name: order-in-progress
   namespace: eda-demo
 spec:
-  addressName: order
+  addressName: order-in-progress
   queueName: order-in-progress
   routingType: anycast

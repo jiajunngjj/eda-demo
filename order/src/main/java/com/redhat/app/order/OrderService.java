@@ -22,8 +22,8 @@ public class OrderService {
 
     Logger log = LoggerFactory.getLogger(this.getClass());
     @Inject
-    @Channel("new-order")    
-    Emitter<String> emitter;
+    @Channel("order-new")    
+    Emitter<String> newOrderEmitter;
     
     @Inject
     @Channel("order-error-inv")    
@@ -37,14 +37,15 @@ public class OrderService {
 
     List<Transaction> txList = new ArrayList<Transaction>();
 
-    @Incoming("inventory-completed")//in-progress-order
+    @Incoming("order-in-progress")//in-progress-order
     public String process(String json) {
         
-        log.info("Inventory done for "+json);
         Order order = gson.fromJson(json, Order.class);
+        log.info("Received event from in progress queue: "+order);
         //simplified
         //put logic to check if all the dependent services are completed.
         // for now, after inventory check is done, we will mark as complete
+        log.info("Completing order "+order);
         this.completeTransaction(order);
         return json;
     }
@@ -84,18 +85,19 @@ public class OrderService {
     }
 
     public void completeTransaction(Order order) {
-
+        log.info("Inside Complete order "+order);
         Transaction tx = Transaction.findById(order.getId());
         tx.setStatus("COMPLETED");
         tx.setInventoryStatus("COMPLETED");
         tx.update();
+        log.info("Updating stream "+order);
         updateStreamStatus("Order Confirmed: "+order.getId());
 
     }
 
 
     public Order newOrder(Order order) {
-        log.info("Order "+order);
+        log.info("NEW Order "+order);
         //create transaction
         
         Transaction tx = new Transaction();
@@ -109,7 +111,7 @@ public class OrderService {
 
         String json = gson.toJson(order);
         updateStreamStatus("Order Received:  "+order.getId()+" is being processed");
-        emitter.send(json);//send to new-order queue
+        newOrderEmitter.send(json);//send to order-new queue
         //statusEmitter.send("test" + order.getId());
 
         //updateStatus();
@@ -123,7 +125,7 @@ public class OrderService {
 
     @Incoming("status-input")
     @Outgoing("status-stream")                          
-    //@Broadcast                                           
+    @Broadcast                                           
     public String updateStatus(String json) {
         log.info("status update called "+json);
         return json;

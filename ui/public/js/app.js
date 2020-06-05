@@ -17,7 +17,10 @@ var App = {
         $.ajax({
             method: "POST",
             url: "./submit",
-            data: formData
+            data: formData,
+            headers: {
+              'Accept': 'text/event-stream'
+            }
           })
             .done(function( msg ) {
               console.log( "received: " + msg );
@@ -26,6 +29,7 @@ var App = {
             });        
 
     }, stream:function() {
+      console.log("here");
             //submit form
             $.ajax({
               method: "GET",
@@ -33,7 +37,8 @@ var App = {
             })
               .done(function( msg ) {
                 console.log( "received: " + msg );
-                return msg;
+                $('#status0').html("123");
+                //return msg;
               });  
     }
 

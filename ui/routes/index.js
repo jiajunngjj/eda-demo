@@ -20,7 +20,7 @@ router.get('/stream', function(req,res,next){
         const options = {
             host: 'order-eda-demo.apps.cluster-sgp-ca65.sgp-ca65.example.opentlc.com',
             port: 80,
-            path: '/rest/orders/status',
+            path: '/rest/orders/status/111',
             method: 'GET',
             headers: {
               'Accept': 'text/event-stream'
@@ -32,19 +32,23 @@ router.get('/stream', function(req,res,next){
             //console.log('HEADERS: ' + JSON.stringify(res.headers));
           
             // Buffer the body entirely for processing as a whole.
-            //var bodyChunks = [];
+            var bodyChunks = [];
             httpres.on('data', function(chunk) {
               // You can process streamed parts here...
-              //bodyChunks.push(chunk);
-              res.write(chunk);
+              bodyChunks.push(chunk);
+              console.log(Object.keys(chunk));
+              console.log(chunk[0]);
+              res.write(chunk.toString());
             }).on('end', function() {
               //var body = Buffer.concat(bodyChunks);
               console.log('end');
+              //console.log(body);
+              
             })
           });
 
         //res.write(`data: ${JSON.stringify({num: counter})}\n\n`); // res.write() instead of res.send()
-   // }, 3000);    
+    //}, 3000);    
 } );
 router.post('/submit', function(req, res, next) {
   console.log(req.body);
