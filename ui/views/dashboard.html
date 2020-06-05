@@ -123,7 +123,8 @@ $( document ).ready(function() {
        $("#status0").html(event.data);
     };
 source.onerror = function(error) {
-    console.log("error!"+error.message);
+
+  console.log("error! "+error.message);
     source = new EventSource("http://<%=host%>/rest/orders/status/"+randomId);	
  } ; //error        
 });

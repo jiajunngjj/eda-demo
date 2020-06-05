@@ -78,11 +78,12 @@ public class InventoryService {
     //to update inventory of stock, if qty ordered is higher, throw exception and return exp
     // to calling method which is process(new order). a message will be returned to orderservice
     private Order updateInventory(Order order) throws InventoryException{
+        
         Inventory i =Inventory.findById(order.getProduct());
         log.info("find by id "+i);
-        log.info("Update inventory with order "+order+"| inv:"+i.getStock());
-
+    
         if (i !=null ) {
+            log.info("---Update inventory with order "+order+"| inv:"+i.getStock());
             if ( (i.getStock().intValue() < order.getQty().intValue())) {
                 order.setStatus("INVENTORY_INSUFFICIENT_STOCK");
 
@@ -92,9 +93,10 @@ public class InventoryService {
             }
             i.setStock(Integer.valueOf(i.getStock().intValue() - order.getQty().intValue()));
             i.update();
+            log.info("---Updated inventory with order "+order+"| inv:"+i.getStock());
+
         }
         order.setStatus("INVENTORY_UPDATED");
-        log.info("Updated inventory with order "+order+"| inv:"+i.getStock());
         return order;
     }
 }
