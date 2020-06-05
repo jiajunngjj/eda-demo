@@ -82,7 +82,7 @@ public class InventoryService {
         Inventory i =Inventory.findById(order.getProduct());
         log.info("find by id "+i);
     
-        if (i !=null ) {
+        if (i !=null && order.getQty() !=null) {
             log.info("---Update inventory with order "+order+"| inv:"+i.getStock());
             if ( (i.getStock().intValue() < order.getQty().intValue())) {
                 order.setStatus("INVENTORY_INSUFFICIENT_STOCK");
