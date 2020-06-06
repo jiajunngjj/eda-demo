@@ -80,18 +80,28 @@
 
     <div id="title">Order Status:</div>
   </hr>
+  <div id="orderStatus">
+    <!--
     <div style="text-align: left;" id="status0"></div>
     <div style="text-align: left;" id="status1"></div>
     <div style="text-align: left;" id="status2"></div>
     <div style="text-align: left;" id="status3"></div>
     <div  style="text-align: left;" id="status4"></div>
-
+    -->
+  </div>
   </div>
   <div class="col col-lg-2">&nbsp;</div>
 </div>
 <div id="response"></div>
+<div id="blank">&nbsp;</div>
 
-
+<div style="text-align: left;" id="summary">
+    <div> Order Summary:</div>
+    <div style="text-align: left;" id="totalCnt">Total Orders: <label id="total"></label></div>
+    <div style="text-align: left;" id="completedCnt">Confirmed: <label id="completed"></label></div>
+    <div style="text-align: left;" id="outOfStockCnt">Out of Stock: <label id="outOfStock"></label></div>
+    <div style="text-align: left;" id="failedCnt">Failed: <label id="failed"></label></div>
+</div>
 <!---->
   </div>
 
@@ -110,17 +120,49 @@ $( document ).ready(function() {
     var source = new EventSource("http://<%=host%>/rest/orders/status/"+randomId);	
     //var source = App.stream();
     console.log(source);
+    var rows=10;
+  var row = rows-1;
+  for (var i = (rows);i--; i==0) {
+    $('#orderStatus').append('<div style="text-align: left;" id="status'+i+'"></div>');
+    //console.log(i);
+  }
   var updates=["","",""];
   var cnt=0;
-  
+  var completedOrder=0;
+  var failedOrder=0;
+  var outofStockOrder=0;
+  var status="";
+
   source.onmessage = function (event) {
        console.log(cnt+ " event");
       //move down
-      $("#status4").html($("#status3").html());
-      $("#status3").html($("#status2").html());
-      $("#status2").html($("#status1").html());
-       $("#status1").html($("#status0").html());
-       $("#status0").html(event.data);
+      while (row!=0) {
+        $("#status"+row).html($("#status"+(row-1)).html());
+        $("#status0").html(event.data);
+        row--;
+      }
+      row = rows-1;
+
+      status=event.data;
+      if (status.startsWith("ORDER RECEIVED:")) {
+        
+        $("#total").html(++cnt);
+      } else  
+      if (status.startsWith("ORDER COMPLETED:")) {
+        
+        $("#completed").html(++completedOrder);
+      } else        
+      if (status.startsWith("ORDER CANCELLED - Timeout:")) {
+        
+        $("#failed").html(++failedOrder);
+      } 
+      else        
+      if (status.startsWith("ORDER CANCELLED - Out of Stock:")) {
+        
+        $("#outOfStock").html(++outofStockOrder);
+      } 
+
+
     };
 source.onerror = function(error) {
 

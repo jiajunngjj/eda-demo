@@ -37,8 +37,63 @@ oc expose service inventory
 
 
 
-oc new-app nodejs~https://github.com/jiajunngjj/eda-demo#dev1 --context-dir="/ui" --name=ui --env=BACKEND_URL=order.eda-demo.svc.cluster.local --env=BACKEND_PORT=8080 --env=host=<route of order service> 
+oc new-app nodejs~https://github.com/jiajunngjj/eda-demo#dev1 --context-dir="/ui" --name=ui --env=BACKEND_URL=order.eda-demo.svc.cluster.local --env=BACKEND_PORT=8080 --env=URL=<route of order service> 
 
 oc expose svc ui
 
 # there is dashboard page <ui route>/dashboard , that shows a real time update of the order status
+
+
+//test, no id will be generated backend
+{"product":"Burger","qty":"1","customer":"","email":"","address":"","id":""}
+
+ curl -X POST -H 'Content-type: application/json' -d '{"product":"Burger","qty":"1","customer":"joe","email":"a@b.com","address":"","id":""}' 192.168.0.110:8080/rest/orders/submit
+
+ curl -v -X GET -H 'Content-type: application/json' 192.168.0.110:8080/rest/orders/status/123
+
+
+for value in {1..50};  \
+do 
+     curl -X POST -H 'Content-type: application/json' -d '{"product":"Burger","qty":"1","customer":"joe","email":"a@b.com","address":"","id":""}' 192.168.0.110:8080/rest/orders/submit; \
+done
+
+echo All done
+
+---------------------------------------------------
+./run.sh 100
+
+echo 'run' $1 'times'
+for value in $(eval echo {1..$1});  \
+
+do
+    echo $value; \ 
+    curl -X POST -H 'Content-type: application/json' -d '{"product":"Burger","qty":"1","customer":"joe","email": "a-'$value'@b.com","address":"","id":""}' 192.168.0.110:8080/rest/orders/submit;
+    echo '--'
+done
+
+---------------------------------------------------
+./run.sh 100 http://192.168.0.110:8080 Sushi
+
+echo 'run' $1 'times'
+$url=$2
+for value in $(eval echo {1..$1});  \
+$product=$3
+
+echo 'run' $1 'times'
+echo $2
+echo $3
+url=$2
+product=$3
+for value in $(eval echo {1..$1});  \
+do
+    echo $value;
+    curl -X POST -H 'Content-type: application/json' -d '{"product": "'$product'","qty":"1","customer":"joe","email": "a-'$value'@b.com","address":"","id":""}' $url/rest/orders/submit;
+    echo;
+done
+
+
+db.Inventory.find( { _id: "Sushi" } )
+
+db.Inventory.update( { _id: "Sushi" }, {$set: {stock: 10}} )
+
+{"product": "'$product'","qty":"1","customer":"joe","email": "a-'$value'@b.com","address":"","id":"", status:"INVENTORY_INSUFFICIENT_STOCK"}

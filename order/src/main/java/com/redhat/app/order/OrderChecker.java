@@ -27,10 +27,19 @@ public class OrderChecker {
         log.info("found "+txList.size());
         for (Transaction transaction : txList) {
             //TODO move this time check to mongodb query :P
-            if (System.currentTimeMillis() - transaction.getDate().getTime() > 5000 ) {
+            if (System.currentTimeMillis() - transaction.getDate().getTime() > 10000 ) {
                 transaction.setStatus("CANCELLED");
-                orderService.cancelStaleTransactions(transaction.getOrder());
-                transaction.update();
+                transaction.update(); 
+             try {
+                   orderService.cancelStaleTransactions(transaction.getOrder());
+                    
+                } catch (IllegalStateException ex) {
+                    log.info("illegal stateexception thrown, try cancelling order again");
+                    orderService.cancelStaleTransactions(transaction.getOrder());
+                } catch (Exception ex) {
+                    log.info("illegal stateexception thrown, try cancelling order again");
+                    orderService.cancelStaleTransactions(transaction.getOrder());
+                }
             }
         }
     }

@@ -7,6 +7,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
+import org.eclipse.microprofile.reactive.messaging.OnOverflow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,10 +17,12 @@ public class InventoryService {
 
     @Inject
     @Channel("order-in-progress")//in-progress-order
+    @OnOverflow(OnOverflow.Strategy.LATEST)    
     Emitter<String> inprogressEmitter;
 
     @Inject
     @Channel("order-error")
+    @OnOverflow(OnOverflow.Strategy.LATEST)    
     Emitter<String> errorEmitter;    
 
     @ConfigProperty(name = "app.error.inventory.id")
@@ -34,11 +37,11 @@ public class InventoryService {
         Order order = gson.fromJson(json, Order.class);   
         log.info("Received new order "+order);
         try {
-                Thread.sleep(1500);
+                //Thread.sleep(1500);
                 //simulate delay in processing
                 this.updateInventory(order);
                 json = gson.toJson(order);
-                log.info("Down updating inventory, sending to in progress emitter "+order);
+                log.info("Done updating inventory, sending to in progress emitter "+order);
 
                 inprogressEmitter.send(json);
     
@@ -48,10 +51,18 @@ public class InventoryService {
             log.info("Inventory Error captured "+e.getMessage());
             order.setStatus(e.getMessage());         
             json = gson.toJson(order);
+            log.info("sending to order error queue "+order);
             errorEmitter.send(json);
-		} catch (InterruptedException e) {
-            e.printStackTrace();
-        } 
+        } catch (Exception ex) {
+            //for any illegal state exceptions
+            log.info("Exception "+ex);
+            //resend
+            errorEmitter.send(json);
+        }
+
+        //catch (InterruptedException e) {
+          //  e.printStackTrace();
+       // } 
 
         return order;
     }
