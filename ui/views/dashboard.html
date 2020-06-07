@@ -168,8 +168,16 @@ source.onerror = function(error) {
 
   console.log("error! "+error.message);
     source = new EventSource("http://<%=host%>/rest/orders/status/"+randomId);	
- } ; //error        
+ } ; //error    
+
+source.oncomplete = function(event) {
+
+  console.log("complete "+event);
+    source.close();
+ } ; //error    
+
 });
+
 
 	</script>
 

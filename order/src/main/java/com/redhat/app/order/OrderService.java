@@ -96,8 +96,13 @@ public class OrderService {
             //update screen status
             //updateStreamStatus("Order Cancelled: "+order.getId()+" , Reason: "+order.getStatus());
             String json = gson.toJson(order);
-            updateStreamStatus(json);
-        }
+            try {
+                updateStreamStatus(json);
+            } catch (Exception ex) {
+                log.info("error in cancel tx "+ex+" ....ignoring");
+    
+            }
+         }
     }
 
     //called by cron job
@@ -106,7 +111,12 @@ public class OrderService {
                 //update screen status
         //updateStreamStatus("Order Cancelled: "+order.getId()+" Reason: time out");
         String json = gson.toJson(order);
+        try {
         updateStreamStatus(json);
+        } catch (Exception ex) {
+            log.info("error in cancel stale tx "+ex+" ....ignoring");
+
+        }
     }
 
     public void completeTransaction(Order order) {
@@ -121,7 +131,11 @@ public class OrderService {
                 log.info("Updating stream "+order);
                 //updateStreamStatus("Order Confirmed: "+order.getId());
                 String json = gson.toJson(order);
-                updateStreamStatus(json);
+                try {
+                    updateStreamStatus(json);
+                } catch (Exception ex) {
+                    log.info("error in new order "+ex+" ....ignoring");
+                }
             }
         }
     }
@@ -147,8 +161,14 @@ public class OrderService {
         tx.persist();
         String json = gson.toJson(order);
         //updateStreamStatus("Order Received:  "+order.getId()+" is being processed");
-        updateStreamStatus(json);
+        try {
+         updateStreamStatus(json);
+        } catch (Exception ex) {
+            log.info("error in new order "+ex+" ....ignoring");
+
+        }
         newOrderEmitter.send(json);//send to order-new queue
+
         //statusEmitter.send("test" + order.getId());
 
         //updateStatus();
@@ -161,8 +181,9 @@ public class OrderService {
         try {
         statusEmitter.send(status);
         } catch (Exception ex) {
-            log.info("caught exception.... resending");
-            statusEmitter.send(status);
+            log.info("****caught exception sending stream.... "+ex);
+            log.info("close it ");
+            statusEmitter.complete();
         }
 
     }

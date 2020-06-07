@@ -1,14 +1,45 @@
 
+oc new-project eda-demo
+
+
 # deploy amq broker operator
-# create objects
-oc create -f scri[ts/
+
+# add in specs in broker.xml
+# wait till broker is operational
+# before creating queues
+# create objects queues
+oc create -f scripts/queues/
+# create svc for amqp
+oc create -f scripts/amqp-svc.yml
+#expose console route
+oc expose svc ex-aao-hdls-svc
+
+
 
 # deploy mongodb
-oc new-app mongodb
+oc create -f scripts/mongodb-ephemeral.yml 
+oc new-app mongodb-ephemeral
 # already predefined with admin:admin]
 
-cd order
+#deploy inventory service
+cd inventory
 
+mvn package
+oc new-build --binary --name=inventory -l app=inventory
+oc patch bc/inventory -p "{\"spec\":{\"strategy\":{\"dockerStrategy\":{\"dockerfilePath\":\"src/main/docker/Dockerfile.jvm\"}}}}"
+oc start-build inventory --from-dir=. --follow
+
+# To instantiate the image
+oc new-app --image-stream=inventory:latest
+
+# To create the route, not needed though
+oc expose service inventory
+
+# Starting the inventory svc instantiate some records in mongodb
+
+
+# deploy order svc
+cd order
 mvn package
 oc new-build --binary --name=order -l app=order
 oc patch bc/order -p "{\"spec\":{\"strategy\":{\"dockerStrategy\":{\"dockerfilePath\":\"src/main/docker/Dockerfile.jvm\"}}}}"
@@ -20,20 +51,6 @@ oc new-app --image-stream=order:latest
 # To create the route
 oc expose service order
 
-cd inventory
-
-mvn package
-oc new-build --binary --name=inventory -l app=inventory
-oc patch bc/inventory -p "{\"spec\":{\"strategy\":{\"dockerStrategy\":{\"dockerfilePath\":\"src/main/docker/Dockerfile.jvm\"}}}}"
-oc start-build inventory --from-dir=. --follow
-
-# To instantiate the image
-oc new-app --image-stream=inventory:latest
-
-# To create the route
-oc expose service inventory
-
-# Starting the inventory svc instantiate some records in mongodb
 
 
 
@@ -72,24 +89,22 @@ do
 done
 
 ---------------------------------------------------
-./run.sh 100 http://192.168.0.110:8080 Sushi
+./run1.sh 300 http://order-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com Sushi john
 
-echo 'run' $1 'times'
-$url=$2
-for value in $(eval echo {1..$1});  \
-$product=$3
-
+//
 echo 'run' $1 'times'
 echo $2
 echo $3
 url=$2
 product=$3
+cust=$4
 for value in $(eval echo {1..$1});  \
 do
-    echo $value;
-    curl -X POST -H 'Content-type: application/json' -d '{"product": "'$product'","qty":"1","customer":"joe","email": "a-'$value'@b.com","address":"","id":""}' $url/rest/orders/submit;
-    echo;
+    echo $value; 
+    curl -X POST -H 'Content-type: application/json' -d '{"product": "'$product'","qty":"1","customer":"'$cust'","email": "'$cust'@b.com","address":"","id":"'$cust$value$(date +"%T")'"}' $url/rest/orders/submit; 
+    echo; 
 done
+
 
 
 db.Inventory.find( { _id: "Sushi" } )
@@ -97,3 +112,100 @@ db.Inventory.find( { _id: "Sushi" } )
 db.Inventory.update( { _id: "Sushi" }, {$set: {stock: 10}} )
 
 {"product": "'$product'","qty":"1","customer":"joe","email": "a-'$value'@b.com","address":"","id":"", status:"INVENTORY_INSUFFICIENT_STOCK"}
+
+
+ mongo --port 27017  --authenticationDatabase "admin" -u "admin" -p
+db.Inventory.update( { _id: "Sushi" }, {$set: {stock: 1000}} )
+
+amq-broker/bin/artemis address show --url tcp://ex-aao-hdls-svc:61616
+$.artemis.internal.sf.my-cluster.5e53fd3a-a7f5-11ea-b4ba-0a580a83001e
+activemq.management.a792fc64-6d8d-46c8-b698-226ab2c3d85c
+activemq.notifications
+DLQ
+ExpiryQueue
+order-error
+order-error-inv
+order-in-progress
+order-new
+
+amq-broker/bin/artemis queue stat --url tcp://ex-aao-hdls-svc:61616
+
+curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com:80/console/jolokia/exec/org.apache.activemq.artemis:broker="amq-broker",component=addresses,address="order-new",subcomponent=queues,routing-type="anycast",queue="order-new"/resetMessagesAdded()'
+
+
+curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com:80/console/jolokia/exec/org.apache.activemq.artemis:broker="amq-broker",component=addresses,address="order-new",subcomponent=queues,routing-type="anycast",queue="order-new"/MessagesAcknowledged'
+
+
+curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com:80/console/jolokia/exec/org.apache.activemq.artemis:broker="amq-broker",component=addresses,address="order-new",subcomponent=queues,routing-type="anycast",queue="order-new"/resetMessagesAcknowledged()'
+
+curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com:80/console/jolokia/exec/org.apache.activemq.artemis:broker="amq-broker",component=addresses,address="order-new",subcomponent=queues,routing-type="anycast",queue="order-new"/countMessages()'
+
+
+//order-new
+//reset added and ack
+curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-new!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-new!%22/resetMessagesAdded()'
+
+curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-new!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-new!%22/resetMessagesAcknowledged()'
+
+//get
+curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com/console/jolokia/read/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-new!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-new!%22/MessagesAcknowledged'
+
+curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com/console/jolokia/read/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-new!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-new!%22/MessagesAdded'
+
+//svc //or pod ip
+oc rsh ex-aao-ss-0 / 1
+
+curl 'http://admin:admin@ex-aao-hdls-svc:8161/console/jolokia/read/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-new!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-new!%22/MessagesAdded'
+
+curl 'http://admin:admin@ex-aao-hdls-svc:8161/console/jolokia/read/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-error!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-error!%22/MessagesAdded'
+
+curl 'http://admin:admin@ex-aao-hdls-svc:8161/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-error!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-error!%22/resetMessagesAdded()'
+
+curl 'http://admin:admin@ex-aao-hdls-svc:8161/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-new!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-new!%22/resetMessagesAdded()'
+
+
+curl 'http://admin:admin@ex-aao-hdls-svc:8161/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-in-progress!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-in-progress!%22/resetMessagesAdded()'
+
+//ip
+
+curl 'http://admin:admin@10.131.0.30:8161/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-new!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-new!%22/resetMessagesAdded()'
+
+curl 'http://admin:admin@10.131.0.30:8161/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-in-progress!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-in-progress!%22/resetMessagesAdded()'
+
+curl 'http://admin:admin@10.131.0.30:8161/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-error!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-error!%22/resetMessagesAdded()'
+
+
+
+curl 'http://admin:admin@10.128.2.24:8161/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-new!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-new!%22/resetMessagesAdded()'
+
+curl 'http://admin:admin@10.128.2.24:8161/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-in-progress!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-in-progress!%22/resetMessagesAdded()'
+
+
+curl 'http://admin:admin@10.128.2.24:8161/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-error!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-error!%22/resetMessagesAdded()'
+
+
+
+//check 
+curl 'http://admin:admin@10.131.0.30:8161/console/jolokia/read/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-new!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-new!%22/MessagesAdded'
+
+curl 'http://admin:admin@10.131.0.30:8161/console/jolokia/read/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-error!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-error!%22/MessagesAdded'
+
+curl 'http://admin:admin@10.131.0.30:8161/console/jolokia/read/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-in-progress!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-in-progress!%22/MessagesAdded'
+
+curl 'http://admin:admin@10.128.2.24:8161/console/jolokia/read/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-new!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-new!%22/MessagesAdded'
+
+curl 'http://admin:admin@10.128.2.24:8161/console/jolokia/read/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-error!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-error!%22/MessagesAdded'
+
+curl 'http://admin:admin@10.128.2.24:8161/console/jolokia/read/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-in-progress!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-in-progress!%22/MessagesAdded'
+
+
+//order-error
+//reset added and ack
+curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-error!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-error!%22/resetMessagesAdded()'
+
+curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-error!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-error!%22/resetMessagesAcknowledged()'
+
+//get
+curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com/console/jolokia/read/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-error!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-error!%22/MessagesAcknowledged'
+
+curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com/console/jolokia/read/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-error!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-error!%22/MessagesAdded'

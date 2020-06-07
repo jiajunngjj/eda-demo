@@ -34,11 +34,11 @@ public class OrderChecker {
                    orderService.cancelStaleTransactions(transaction.getOrder());
                     
                 } catch (IllegalStateException ex) {
-                    log.info("illegal stateexception thrown, try cancelling order again");
-                    orderService.cancelStaleTransactions(transaction.getOrder());
+                    log.info("illegal stateexception thrown while checking order, ignoring");
+                    //orderService.cancelStaleTransactions(transaction.getOrder());
                 } catch (Exception ex) {
-                    log.info("illegal stateexception thrown, try cancelling order again");
-                    orderService.cancelStaleTransactions(transaction.getOrder());
+                    log.info("generic exception thrown while checking order, ignoring");
+                    //orderService.cancelStaleTransactions(transaction.getOrder());
                 }
             }
         }

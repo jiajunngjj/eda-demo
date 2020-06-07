@@ -1,7 +1,11 @@
 package com.redhat.app.inventory;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
+import javax.transaction.Transactional;
+
 import com.google.gson.Gson;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.reactive.messaging.Channel;
@@ -14,6 +18,7 @@ import org.slf4j.LoggerFactory;
 @ApplicationScoped
 public class InventoryService {
     Gson gson = new Gson();
+
 
     @Inject
     @Channel("order-in-progress")//in-progress-order
@@ -56,6 +61,7 @@ public class InventoryService {
         } catch (Exception ex) {
             //for any illegal state exceptions
             log.info("Exception "+ex);
+            
             //resend
             errorEmitter.send(json);
         }
@@ -79,8 +85,10 @@ public class InventoryService {
         
         //dirty hack - simple scenario, add back the reduced qty
         log.info("detected Error in order txn: "+order.getId()+" , reverting inventory");
-        //order.setQty(order.getQty()*(-1));
+        order.setQty(order.getQty()*(-1));
+        //for mongodb
         Inventory i =Inventory.findById(order.getProduct());
+
         i.setStock(i.getStock()+order.getQty());
         i.update();
         order.setStatus("INVENTORY_REVERTED");
@@ -89,8 +97,9 @@ public class InventoryService {
     //to update inventory of stock, if qty ordered is higher, throw exception and return exp
     // to calling method which is process(new order). a message will be returned to orderservice
     private Order updateInventory(Order order) throws InventoryException{
-        
+        //mongodb
         Inventory i =Inventory.findById(order.getProduct());
+        
         log.info("find by id "+i);
     
         if (i !=null && order.getQty() !=null) {
@@ -98,13 +107,19 @@ public class InventoryService {
             if ( (i.getStock().intValue() < order.getQty().intValue())) {
                 order.setStatus("INVENTORY_INSUFFICIENT_STOCK");
 
-                String json = gson.toJson(order);
+                //String json = gson.toJson(order);
                 //errorEmitter.send(json);
                 throw new InventoryException("INVENTORY_INSUFFICIENT_STOCK");
             }
+
             i.setStock(Integer.valueOf(i.getStock().intValue() - order.getQty().intValue()));
             i.update();
+            
             log.info("---Updated inventory with order "+order+"| inv:"+i.getStock());
+            log.info("***********************************************************************************");
+            log.info("*********"+order.getId()+"****"+i.getStock()+"*************************************");
+            log.info("***********************************************************************************");
+            
 
         }
         order.setStatus("INVENTORY_UPDATED");

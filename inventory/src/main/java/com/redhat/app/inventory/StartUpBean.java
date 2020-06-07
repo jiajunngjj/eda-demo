@@ -5,6 +5,8 @@ import java.util.List;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.event.Observes;
+import javax.inject.Inject;
+import javax.transaction.Transactional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,11 +19,15 @@ import io.quarkus.runtime.StartupEvent;
 public class StartUpBean {
     Logger log = LoggerFactory.getLogger(this.getClass());
     
-    List<Inventory> list = new ArrayList<Inventory>();
+    List<Inventory> list;
+    
     void onStart(@Observes StartupEvent ev) {               
         log.info("The application is starting...Creating seed records if there is none");
         PanacheQuery<Inventory> q = Inventory.findAll();
+        list = Inventory.listAll();
+        
         if (q.list().size() == 0 ) { 
+        
             //create new inventory
             Inventory inv1 = new Inventory();
 
@@ -41,6 +47,7 @@ public class StartUpBean {
             inv2.setPrice(Double.valueOf(29.5));
             list.add(inv2);
             inv2.persist();
+            
 
             Inventory inv3 = new Inventory();
             //inv2.setId("f0003");
@@ -49,14 +56,16 @@ public class StartUpBean {
             inv3.setStock(Integer.valueOf(2500));
             inv3.setPrice(Double.valueOf(3.5));
             list.add(inv3);
+            
             inv3.persist();
      }
     }
-
+    @Transactional
     void onStop(@Observes ShutdownEvent ev) {               
         log.info("The application is stopping...cleaning up seed record");
-        for (Inventory inventory : list) {
-            inventory.delete();
-        }
+        Inventory.deleteAll();
+        //for (Inventory inventory : list) {
+           //inventory.delete();
+        //}
     }    
 }
