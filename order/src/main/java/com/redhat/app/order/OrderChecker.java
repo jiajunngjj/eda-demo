@@ -24,12 +24,12 @@ public class OrderChecker {
     void checkOrder() {
         log.info("checking for stale orders....");
         List<Transaction> txList = Transaction.findInCompleteTransactions();
-        log.info("found "+txList.size());
+        log.info("***************************found stale tx "+txList.size());
         for (Transaction transaction : txList) {
             //TODO move this time check to mongodb query :P
-            if (System.currentTimeMillis() - transaction.getDate().getTime() > 10000 ) {
-                transaction.setStatus("CANCELLED");
-                transaction.update(); 
+            if (System.currentTimeMillis() - transaction.getDate().getTime() > 8000 ) {
+                //transaction.setStatus("CANCELLED");
+                //transaction.update(); 
              try {
                    orderService.cancelStaleTransactions(transaction.getOrder());
                     

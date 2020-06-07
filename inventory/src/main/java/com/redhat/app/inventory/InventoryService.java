@@ -22,12 +22,14 @@ public class InventoryService {
 
     @Inject
     @Channel("order-in-progress")//in-progress-order
-    @OnOverflow(OnOverflow.Strategy.LATEST)    
+    //@OnOverflow(value=OnOverflow.Strategy.BUFFER, bufferSize=512)                
+    @OnOverflow(OnOverflow.Strategy.LATEST)                
     Emitter<String> inprogressEmitter;
 
     @Inject
     @Channel("order-error")
-    @OnOverflow(OnOverflow.Strategy.LATEST)    
+    //@OnOverflow(value=OnOverflow.Strategy.BUFFER, bufferSize=512)                
+    @OnOverflow(OnOverflow.Strategy.LATEST)                
     Emitter<String> errorEmitter;    
 
     @ConfigProperty(name = "app.error.inventory.id")
@@ -77,15 +79,23 @@ public class InventoryService {
     //flow ends here, we may want to return a message to orderservice
     @Incoming("order-error-inv")
     public Order processError(String json) {
+        log.info("incoming error inv ----- "+json);
+        
         //ignore event sent out by myself
         Order order = gson.fromJson(json, Order.class);
-        if (order.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
+
+        if (order ==null || order.getStatus()==null) {
+            log.info("order = null, corrupted data ");
+            return new Order();
+        } else 
+        if ( order.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
+            log.info("Insufficient stock error, nothng to do, did not reduce stock in the first place");
             return order;
         }
         
         //dirty hack - simple scenario, add back the reduced qty
         log.info("detected Error in order txn: "+order.getId()+" , reverting inventory");
-        order.setQty(order.getQty()*(-1));
+        
         //for mongodb
         Inventory i =Inventory.findById(order.getProduct());
 

@@ -27,6 +27,7 @@ public class Transaction extends PanacheMongoEntity{
 
     public static List<Transaction> findInCompleteTransactions(){
         return list("status", "NEW");
+        //return list("{ status: { $ne: ?1 }, status: { $ne: ?2 } } ", "COMPLETED", "CANCELLED");
     }
     
 }

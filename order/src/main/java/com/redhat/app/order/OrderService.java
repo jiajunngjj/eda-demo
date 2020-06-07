@@ -28,17 +28,20 @@ public class OrderService {
     Logger log = LoggerFactory.getLogger(this.getClass());
     @Inject
     @Channel("order-new")
-    @OnOverflow(OnOverflow.Strategy.LATEST)        
+    //@OnOverflow(value=OnOverflow.Strategy.BUFFER, bufferSize=512)     
+    @OnOverflow(OnOverflow.Strategy.LATEST)                           
     Emitter<String> newOrderEmitter;
     
     @Inject
     @Channel("order-error-inv")
-    @OnOverflow(OnOverflow.Strategy.LATEST)    
+    //@OnOverflow(value=OnOverflow.Strategy.BUFFER, bufferSize=512)                
+    @OnOverflow(OnOverflow.Strategy.LATEST)                
     Emitter<String> invErrorEmitter;
     
     @Inject
     @Channel("status-input")
-    @OnOverflow(OnOverflow.Strategy.LATEST)        
+    //@OnOverflow(value=OnOverflow.Strategy.BUFFER, bufferSize=512)                
+    @OnOverflow(OnOverflow.Strategy.LATEST)                
     Emitter<String> statusEmitter;
 
     Gson gson = new Gson();
@@ -63,6 +66,14 @@ public class OrderService {
         //simplified
         //put logic to check if all the dependent services are completed.
         // for now, after inventory check is done, we will mark as complete
+        if (order.getStatus().equals("INVENTORY_UPDATED")) {
+            Transaction tx = Transaction.findById(order.getId());
+            if (tx!=null) {
+                merge(tx,order);
+                tx.setInventoryStatus("COMPLETED");
+                tx.update();
+            }
+        }
         log.info("Completing order "+order);
         this.completeTransaction(order);
         return json;
@@ -73,28 +84,38 @@ public class OrderService {
         Order order = gson.fromJson(json, Order.class);
         log.info("**************************************************Error  "+order.getStatus());
         //call downstreams services to handle erros also
-        //order.setStatus("FROM_ORDER_ERROR");
         json = gson.toJson(order);
         //consolidate all error messages, and send to individual queues, 
         // crude, can be refined
         //check that this is a inventory related error, send back to inv-error queue
         if (order.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
-            log.info("Sending to invoice error queue "+order);
+            log.info("Sending to inventory error queue "+order);
             invErrorEmitter.send(json);
         }
+        //if other Service, call their respective logic
         this.cancelTransactions(order);
-        //other Service
-        //updateStreamStatus(order.getId()+" is cancelled");
+        
         return json;
     }
     public void cancelTransactions(Order order) {
         //order.setStatus("CANCELLED");
         Transaction tx = Transaction.findById(order.getId());
         if (tx!=null) {
+            merge(tx,order);
+            //if (
+              //  tx.getOrder().getStatus().equals("INVENTORY_UPDATED") 
+                //|| tx.getInventoryStatus().equals("COMPLETED") 
+            //) {
+                tx.getOrder().setStatus("INVENTORY_REVERT");
+                tx.setInventoryStatus("INVENTORY_REVERT");
+                String error=gson.toJson(tx.getOrder());
+                log.info("sending to inv error queue "+error);
+                invErrorEmitter.send(error);
+
+            //}            
             tx.setStatus("CANCELLED");
             tx.update();
             //update screen status
-            //updateStreamStatus("Order Cancelled: "+order.getId()+" , Reason: "+order.getStatus());
             String json = gson.toJson(order);
             try {
                 updateStreamStatus(json);
@@ -107,11 +128,29 @@ public class OrderService {
 
     //called by cron job
     public void cancelStaleTransactions(Order order) {
-        order.setStatus("CANCELLED");
-                //update screen status
-        //updateStreamStatus("Order Cancelled: "+order.getId()+" Reason: time out");
-        String json = gson.toJson(order);
+        log.info("INSIDE CANCELSTALETX "+order);
         try {
+            Transaction tx = Transaction.findById(order.getId());
+            merge(tx,order);
+            //if order status is INV UPDATED, means inventory was committed , need to revert
+            //if (tx.getOrder().getStatus().equals("INVENTORY_UPDATED") || tx.getInventoryStatus().equals("COMPLETED")) {
+                //if (
+                //    tx.getOrder().getStatus().equals("INVENTORY_UPDATED") 
+                //    || tx.getInventoryStatus().equals("COMPLETED") 
+                //) {
+       
+                tx.getOrder().setStatus("INVENTORY_REVERT");
+                tx.setInventoryStatus("INVENTORY_REVERT");
+                String error=gson.toJson(tx.getOrder());
+                log.info("sending to inv error queue "+error);
+                invErrorEmitter.send(error);
+            //}
+        //update screen status
+            tx.setStatus("CANCELLED");
+            tx.getOrder().setStatus("CANCELLED");
+            tx.update();
+        String json = gson.toJson(tx.getOrder());
+        log.info("calling streams update "+json);     
         updateStreamStatus(json);
         } catch (Exception ex) {
             log.info("error in cancel stale tx "+ex+" ....ignoring");
@@ -119,17 +158,27 @@ public class OrderService {
         }
     }
 
+    private void merge(Transaction tx, Order order) {
+        tx.getOrder().setCustomer(order.getCustomer());
+        tx.getOrder().setAddress(order.getAddress());
+        tx.getOrder().setEmail(order.getEmail());
+        tx.getOrder().setStatus(order.getStatus());
+        tx.getOrder().setQty(order.getQty());
+        tx.getOrder().setProduct(order.getProduct());
+        tx.getOrder().setId(order.getId());
+    }
     public void completeTransaction(Order order) {
         log.info("Inside Complete order "+order);
         order.setStatus("COMPLETED");
         if (!order.getStatus().equals("CANCELLED")) {
             Transaction tx = Transaction.findById(order.getId());
             if (tx!=null) {
+                //transfer order status to tx
+                merge(tx,order);
                 tx.setStatus("COMPLETED");
                 tx.setInventoryStatus("COMPLETED");
                 tx.update();
                 log.info("Updating stream "+order);
-                //updateStreamStatus("Order Confirmed: "+order.getId());
                 String json = gson.toJson(order);
                 try {
                     updateStreamStatus(json);
@@ -152,7 +201,6 @@ public class OrderService {
         //create transaction
         
         Transaction tx = new Transaction();
-        //tx.setId(Math.floor(Math.random()*10000)+order.getId());
         tx.setId(order.getId());
         tx.setOrder(order);        
         log.info("tx id: "+tx.getId());
@@ -160,7 +208,6 @@ public class OrderService {
         //if record is not completed, will the job will cancel it
         tx.persist();
         String json = gson.toJson(order);
-        //updateStreamStatus("Order Received:  "+order.getId()+" is being processed");
         try {
          updateStreamStatus(json);
         } catch (Exception ex) {
@@ -168,10 +215,6 @@ public class OrderService {
 
         }
         newOrderEmitter.send(json);//send to order-new queue
-
-        //statusEmitter.send("test" + order.getId());
-
-        //updateStatus();
         return order;
     }
 
@@ -179,7 +222,9 @@ public class OrderService {
         Order order = gson.fromJson(json, Order.class);
         String status = returnStatus.get(order.getStatus())+" "+order.getId();
         try {
-        statusEmitter.send(status);
+            log.info("Emitting "+status );
+            statusEmitter.send(status);
+        
         } catch (Exception ex) {
             log.info("****caught exception sending stream.... "+ex);
             log.info("close it ");

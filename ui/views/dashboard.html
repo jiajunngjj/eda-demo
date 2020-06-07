@@ -164,7 +164,8 @@ $( document ).ready(function() {
 
 
     };
-source.onerror = function(error) {
+  source.onerror = function(error) {
+    console.log("error! "+Object.keys(error));
 
   console.log("error! "+error.message);
     source = new EventSource("http://<%=host%>/rest/orders/status/"+randomId);	

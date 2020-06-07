@@ -47,8 +47,12 @@ public class OrderResource {
     @Produces(MediaType.SERVER_SENT_EVENTS)   
     @SseElementType("text/plain")
     public Publisher<String> getStatus(@PathParam String id) {
-        log.info("Getting status update "+id);
+        try {
+            log.info("Getting status update "+id);
+            
+        } catch (Exception ex) {
+            log.info("Exception in OrderResource get status, ignoring.... "+ex);
+        }
         return statusStream;
-
     }
 }
