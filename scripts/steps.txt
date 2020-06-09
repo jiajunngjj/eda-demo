@@ -64,6 +64,7 @@ oc expose svc ui
 //test, no id will be generated backend
 {"product":"Burger","qty":"1","customer":"","email":"","address":"","id":""}
 
+{"product":"Burger","qty":"1","customer":"","email":"","address":"","id":"john10-14:07:49",status:"INVENTORY_REVERT"}
  curl -X POST -H 'Content-type: application/json' -d '{"product":"Burger","qty":"1","customer":"joe","email":"a@b.com","address":"","id":""}' 192.168.0.110:8080/rest/orders/submit
 
  curl -v -X GET -H 'Content-type: application/json' 192.168.0.110:8080/rest/orders/status/123
