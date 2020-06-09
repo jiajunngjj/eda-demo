@@ -134,7 +134,7 @@ $( document ).ready(function() {
   var status="";
 
   source.onmessage = function (event) {
-       console.log(cnt+ " event");
+      //console.log(cnt+ " event");
       //move down
       while (row!=0) {
         $("#status"+row).html($("#status"+(row-1)).html());
@@ -153,12 +153,12 @@ $( document ).ready(function() {
         $("#completed").html(++completedOrder);
       } else        
       if (status.startsWith("ORDER CANCELLED - Timeout:")) {
-        
+        console.log("Cancelled "+status);
+
         $("#failed").html(++failedOrder);
       } 
       else        
       if (status.startsWith("ORDER CANCELLED - Out of Stock:")) {
-        
         $("#outOfStock").html(++outofStockOrder);
       } 
 
