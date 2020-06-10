@@ -2,6 +2,7 @@ package com.redhat.app.inventory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletionStage;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.event.Observes;
@@ -11,61 +12,47 @@ import javax.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.quarkus.mongodb.panache.PanacheQuery;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
+
+
 
 @ApplicationScoped
 public class StartUpBean {
     Logger log = LoggerFactory.getLogger(this.getClass());
-    
-    List<Inventory> list;
-    
-    void onStart(@Observes StartupEvent ev) {               
-        log.info("The application is starting...Creating seed records if there is none");
-        PanacheQuery<Inventory> q = Inventory.findAll();
-        list = Inventory.listAll();
+    @Inject
+    InventoryRepository repo;
+
+    @Transactional
+    void onStart(@Observes StartupEvent ev) {    
+        log.info("starting up....");
+        Inventory inv1 = new Inventory();
+        //inv1.setId("Burger");
+        inv1.setName("Burger");
+        inv1.setPrice(12.5D);
+        inv1.setStock(1000);
         
-        if (q.list().size() == 0 ) { 
+
+        Inventory inv2 = new Inventory();
+        //inv2.setId("Sushi");
+        inv2.setName("Sushi");
+        inv2.setPrice(2.5D);
+        inv2.setStock(1000);
+        Inventory inv3 = new Inventory();
+        //inv2.setId("Sushi");
+        inv3.setName("Pizza");
+        inv3.setPrice(2.5D);
+        inv3.setStock(1000);
         
-            //create new inventory
-            Inventory inv1 = new Inventory();
+        repo.persist(inv1);
+        repo.persist(inv2);
+        repo.persist(inv3);
 
-            //inv1.setId("f0001");
-            inv1.setId("Burger");
-            inv1.setName("Burger");
-            inv1.setStock(Integer.valueOf(1000));
-            inv1.setPrice(Double.valueOf(22.5));
-            list.add(inv1);
-            inv1.persist();
-
-            Inventory inv2 = new Inventory();
-            //inv2.setId("f0002");
-            inv2.setId("Pizza");
-            inv2.setName("Pizza");
-            inv2.setStock(Integer.valueOf(1000));
-            inv2.setPrice(Double.valueOf(29.5));
-            list.add(inv2);
-            inv2.persist();
-            
-
-            Inventory inv3 = new Inventory();
-            //inv2.setId("f0003");
-            inv3.setId("Sushi");
-            inv3.setName("Sushi");
-            inv3.setStock(Integer.valueOf(1000));
-            inv3.setPrice(Double.valueOf(3.5));
-            list.add(inv3);
-            
-            inv3.persist();
-     }
     }
     @Transactional
-    void onStop(@Observes ShutdownEvent ev) {               
-        log.info("The application is stopping...cleaning up seed record");
-        Inventory.deleteAll();
-        //for (Inventory inventory : list) {
-           //inventory.delete();
-        //}
-    }    
+    void shutdown(@Observes ShutdownEvent ev) {
+        log.info("shutdown");
+        repo.deleteAll();
+        //Inventory.dropTable(client).onItem().apply(deleted -> deleted);
+    }
 }
