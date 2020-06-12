@@ -14,6 +14,10 @@ oc create -f scripts/amqp-svc.yml
 #expose console route
 oc expose svc ex-aao-hdls-svc
 
+# deploy mysql
+
+oc create -f scripts/mysql-ephemeral.yml 
+oc new-app mysql-ephemeral
 
 
 # deploy mongodb
