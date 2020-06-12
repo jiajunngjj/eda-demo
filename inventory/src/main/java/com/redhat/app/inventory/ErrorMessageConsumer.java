@@ -32,6 +32,7 @@ public class ErrorMessageConsumer implements Runnable, MessageListener{
     private final ExecutorService scheduler = Executors.newSingleThreadExecutor();
     
     void onStart(@Observes StartupEvent ev) {
+        context = connectionFactory.createContext(Session.SESSION_TRANSACTED);
         scheduler.submit(this);
     }
 
@@ -60,20 +61,24 @@ public class ErrorMessageConsumer implements Runnable, MessageListener{
 			e.printStackTrace();
         }   
     }
-
+    JMSConsumer errorOrder;
+    JMSContext context ;
     @Override
     public void run() {
-        try (JMSContext context = connectionFactory.createContext(Session.SESSION_TRANSACTED)) 
+        try  
         {
-            JMSConsumer errorOrder = context.createConsumer(context.createQueue("order-error-inv"));
+            errorOrder = context.createConsumer(context.createQueue("order-error-inv"));
+            errorOrder.setMessageListener(this);
 
             while(true) {
                 Thread.sleep(500);
 
-            errorOrder.setMessageListener(this);
             context.commit();
             }
         } catch (Exception e) {
+            log.info("finally ");
+            errorOrder.close();
+            context.close();            
             e.printStackTrace();
         }
     }

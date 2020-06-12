@@ -74,19 +74,22 @@ public class NewOrderMessageConsumer implements Runnable, MessageListener{
     Logger log = LoggerFactory.getLogger(this.getClass());
     @Override
     public void run() {
+        JMSConsumer newOrder =null;
         try  
         {
-            JMSConsumer newOrder = context.createConsumer(context.createQueue("order-new"));
+            newOrder = context.createConsumer(context.createQueue("order-new"));
+            newOrder.setMessageListener(this);
             while(true) {
                 //log.info(" inside consumer "+Thread.currentThread().getId()+"-"+(cnt++));
                 Thread.sleep(500);
-            newOrder.setMessageListener(this);
-            
             context.commit();
+
             }
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
+            log.info("finally ");
+            newOrder.close();
             context.close();
         }
     }
