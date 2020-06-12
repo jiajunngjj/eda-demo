@@ -27,13 +27,13 @@ public class InventoryRepository implements PanacheRepository<Inventory>{
     public Inventory updateStock(Order order, Integer type) throws InventoryException{
         
         Inventory i = find("name",order.getProduct()).withLock(LockModeType.PESSIMISTIC_WRITE).firstResult();
-        log.info("-------before---"+order+"----repo "+i);
+        log.info("-------before---"+order.getProduct()+":"+order.getQty()+":"+order.getStatus()+"----"+i);
         if (type < 0 && i.getStock() < order.getQty()) {
             throw new InventoryException("INVENTORY_INSUFFCIENT_STOCK");
         } 
         i.setStock(i.getStock()+(order.getQty()*type));
         this.persistAndFlush(i);
-        log.info("------after---"+order+"----repo "+i);
+        log.info("-------after---"+order.getProduct()+":"+order.getQty()+":"+order.getStatus()+"----"+i);
 
         return i;
 

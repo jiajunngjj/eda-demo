@@ -22,12 +22,14 @@ public class DBService implements Runnable {
     private Order order;
     private int type;
     private InventoryRepository repo;
+    
     public DBService(Order order, int type, InventoryRepository repo) {
         this.order=order;
         this.type=type;
         this.repo = repo;
         log.info("Constructor "+this.order);
     }
+
     public DBService() {
 
     }

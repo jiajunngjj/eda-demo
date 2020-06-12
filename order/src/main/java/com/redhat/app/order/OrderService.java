@@ -158,18 +158,14 @@ public class OrderService {
             if (!tx.getStatus().equals("COMPLETED")) {
                 merge(tx,order);
                 //if order status is INV UPDATED, means inventory was committed , need to revert
-                //if (tx.getOrder().getStatus().equals("INVENTORY_UPDATED") || tx.getInventoryStatus().equals("COMPLETED")) {
-                    //if (
-                    //    tx.getOrder().getStatus().equals("INVENTORY_UPDATED") 
-                    //    || tx.getInventoryStatus().equals("COMPLETED") 
-                    //) {
-        
+                if (tx.getOrder().getStatus().equals("INVENTORY_UPDATED") ) {
                     tx.getOrder().setStatus("CANCELLING");
                     tx.setInventoryStatus("CANCELLING");
                     String error=gson.toJson(tx.getOrder());
                     invErrorEmitter.send(error);
                     log.info("*******Cancel State Tx: SENT to inv error queue "+error);
                     log.info("*******COUNT:"+(OrderService.outgoingError+=1));
+                    }    
             }
             //}
         //update screen status

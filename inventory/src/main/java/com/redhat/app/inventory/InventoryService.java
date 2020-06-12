@@ -1,10 +1,16 @@
 package com.redhat.app.inventory;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.context.control.ActivateRequestContext;
+import javax.enterprise.event.Observes;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.transaction.Transactional;
@@ -19,11 +25,16 @@ import org.eclipse.microprofile.reactive.messaging.OnOverflow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.quarkus.runtime.ShutdownEvent;
+import io.quarkus.runtime.StartupEvent;
+
 
 
 @ApplicationScoped
 @ActivateRequestContext
 public class InventoryService {
+
+    private static Map<String,List<Order>> records;
     Gson gson = new Gson();
     Logger log = LoggerFactory.getLogger(this.getClass());
     @Inject
@@ -40,12 +51,7 @@ public class InventoryService {
     @Named("ErrorOrderSender")
     MessageSender errorOrderSender;
     */
-    //For debugging , to be removed
-    static int incomingError = 0;
-    static int revertingCount = 0;
-    static int normalInventoryUpdate =0;
-    static int sushicount =0;
-    static int bugercount =0;
+
 
     //private final ExecutorService scheduler = Executors.newSingleThreadExecutor();
     private final ExecutorService scheduler = Executors.newFixedThreadPool(10);
@@ -70,13 +76,22 @@ public class InventoryService {
     //Possible incomeing usecase : NEW
     //Outgoing : INVENTORY_UPDATED, INNVENTORY_INSUFFICIENT_STOCK
 
+
+
+    void startUp(@Observes StartupEvent ev) {
+        records = new HashMap<String, List<Order>>();        
+    }
+
+    void shutdown(@Observes ShutdownEvent ev) {
+        this.info();
+    }
     @Transactional
     @Incoming("order-new")
     public Order processNewOrder(String json) {
         //simulate processing inventory
         
         Order order = gson.fromJson(json, Order.class);   
-        log.info("*******Received new order "+order);
+        log.info("*******Incoming NEW ORDER "+order);
         try {
 
                 
@@ -85,8 +100,7 @@ public class InventoryService {
                 json = gson.toJson(order);
 
                 inprogressEmitter.send(json);
-                //inprogressSender.send(json);
-                
+                //inprogressSender.send(json);   
 
         //} catch (InventoryException e) {
         } catch (Exception e) {
@@ -94,8 +108,6 @@ public class InventoryService {
             //log.info(e.getMessage()+" error thrown");
             order.setStatus(e.getMessage());
             json = gson.toJson(order);
-            
-
             //errorOrderSender.send(json);
             errorEmitter.send(json);
         }
@@ -111,7 +123,6 @@ public class InventoryService {
     @Transactional
     public void processError(String json) throws InventoryException{
         log.info("*******INCOMING INV ERROR ----- "+json);
-        log.info("*******COUNT:"+(InventoryService.incomingError+=1));
     try{
         Order order = gson.fromJson(json, Order.class);
 
@@ -143,28 +154,33 @@ public class InventoryService {
     @Transactional
      private Order updateInventory(Order order, int type, InventoryRepository repo) throws InventoryException{
         synchronized(lock) {
+                if (records.get(order.getStatus()) != null) {
 
-                scheduler.execute(new DBService(order, type, repo));
-
-                /*
-                Inventory i = repo.updateStock(order,type);
-
-                log.info("stock after update:"+i.getName()+":"+i.getName());
-            
-                if(type >0) {
-                    log.info("*********Updating Inventory normal flow :"+(InventoryService.normalInventoryUpdate+=1));
-                    if (i.getName().equals("Sushi")) {
-                        log.info("*********Updating Inventory normal flow sushi:"+(InventoryService.sushicount+=1)+"**"+i.getName()+":"+i.getStock());
-                    }else {
-                        log.info("*********Updating Inventory normal flow burger  :"+(InventoryService.bugercount+=1)+"**"+i.getName()+":"+i.getStock());                
-                    }
+                    records.get(order.getStatus()).add(order);
                 } else {
-                    log.info("************Reverting inventory "+(InventoryService.revertingCount+=1));
-                    log.info("*************"+i.getName()+":"+i.getStock());       
+
+                    records.put(order.getStatus(), new ArrayList<Order>());
+                    records.get(order.getStatus()).add(order);
 
                 }
-                */
+                scheduler.execute(new DBService(order, type, repo));
+
             return order;
         }
+    }
+
+
+    public void info() {
+        Iterator<String> itr = InventoryService.records.keySet().iterator();
+
+        while (itr.hasNext()) {
+            
+            String status = itr.next();
+            //log.info(">>>>> Status: "+status);
+            List<Order> orders = records.get(status);
+            log.info(">>>>> Status: "+status+": count "+orders.size());
+
+        }
+
     }
 }
