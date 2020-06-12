@@ -116,7 +116,6 @@ public class OrderService {
         
         return json;
     }
-<<<<<<< Updated upstream
 
     //outgoing CANCELLING
     public void cancelTransactions(Order order) {

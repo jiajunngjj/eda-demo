@@ -6,10 +6,20 @@ import lombok.Data;
 
 @Data
 public class Order {
+
     String id;
-    Customer customer;
-    Product product;
+    String customer;
+    String product;
+    String address;
+    String email;
     Integer qty;
-    Date date;
     String status;
+
+    /**
+     Product product;
+     Customer customer;
+     Integer qty;
+    */
+
+
 }
