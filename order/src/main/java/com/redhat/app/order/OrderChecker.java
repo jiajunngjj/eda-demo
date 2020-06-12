@@ -27,7 +27,7 @@ public class OrderChecker {
         log.info("***************************found stale tx "+txList.size());
         for (Transaction transaction : txList) {
             //TODO move this time check to mongodb query :P
-            if (System.currentTimeMillis() - transaction.getDate().getTime() > 30000 ) {
+            if (System.currentTimeMillis() - transaction.getDate().getTime() > 5000 ) {
                 //transaction.setStatus("CANCELLED");
                 //transaction.update(); 
              try {

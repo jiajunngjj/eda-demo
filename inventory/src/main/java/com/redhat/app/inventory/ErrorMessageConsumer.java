@@ -68,9 +68,10 @@ public class ErrorMessageConsumer implements Runnable, MessageListener{
         try  
         {
             errorOrder = context.createConsumer(context.createQueue("order-error-inv"));
-            errorOrder.setMessageListener(this);
 
             while(true) {
+                errorOrder.setMessageListener(this);
+
                 Thread.sleep(500);
 
             context.commit();

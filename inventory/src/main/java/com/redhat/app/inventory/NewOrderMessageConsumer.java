@@ -78,9 +78,10 @@ public class NewOrderMessageConsumer implements Runnable, MessageListener{
         try  
         {
             newOrder = context.createConsumer(context.createQueue("order-new"));
-            newOrder.setMessageListener(this);
             while(true) {
                 //log.info(" inside consumer "+Thread.currentThread().getId()+"-"+(cnt++));
+                newOrder.setMessageListener(this);
+
                 Thread.sleep(500);
             context.commit();
 
