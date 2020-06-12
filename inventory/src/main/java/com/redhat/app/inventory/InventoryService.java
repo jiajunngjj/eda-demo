@@ -5,8 +5,10 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.context.control.ActivateRequestContext;
@@ -104,12 +106,17 @@ public class InventoryService {
 
         //} catch (InventoryException e) {
         } catch (Exception e) {
-            e.printStackTrace();
-            //log.info(e.getMessage()+" error thrown");
+            //e.printStackTrace();
+            log.info(e.getMessage()+" NEW ORDER error thrown");
             order.setStatus(e.getMessage());
             json = gson.toJson(order);
+            log.info("SENDING TO ERROR "+json);
             //errorOrderSender.send(json);
+            try {
             errorEmitter.send(json);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
 
         return order;
@@ -145,14 +152,17 @@ public class InventoryService {
         }    
 
     }catch (Exception ex) {
-        ex.printStackTrace();
+        log.info(ex.getMessage()+" Error ORDER error thrown");
+
+        //ex.printStackTrace();
+
     }
     }   
 
 
 
     @Transactional
-     private Order updateInventory(Order order, int type, InventoryRepository repo) throws InventoryException{
+     private Order updateInventory(Order order, int type, InventoryRepository repo) throws InventoryException, InterruptedException, ExecutionException{
         synchronized(lock) {
                 if (records.get(order.getStatus()) != null) {
 
@@ -163,9 +173,18 @@ public class InventoryService {
                     records.get(order.getStatus()).add(order);
 
                 }
-                scheduler.execute(new DBService(order, type, repo));
 
-            return order;
+                //scheduler.execute(new DBService(order, type, repo));
+
+                Future<Order> future = scheduler.submit(new DBService(order, type, repo));
+                Order returnOrder = future.get();
+                log.info("returned from callable "+returnOrder);
+                if (returnOrder.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
+                    //errorEmitter.send(gson.toJson(returnOrder));
+                    log.info("returned from callable "+returnOrder);
+                    throw new InventoryException("INVENTORY_INSUFFICIENT_STOCK");
+                }
+            return returnOrder;
         }
     }
 

@@ -1,5 +1,7 @@
 package com.redhat.app.inventory;
 
+import java.util.concurrent.Callable;
+
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.context.control.ActivateRequestContext;
 import javax.enterprise.event.Observes;
@@ -15,8 +17,9 @@ import lombok.Data;
 @Data
 @ApplicationScoped
 @ActivateRequestContext
-public class DBService implements Runnable {
-
+//public class DBService implements Runnable {
+public class DBService implements Callable<Order> {
+    
 
     Logger log = LoggerFactory.getLogger(this.getClass());
     private Order order;
@@ -40,6 +43,25 @@ public class DBService implements Runnable {
         
         
     }
+
+@Override
+public Order call() throws Exception {
+    Inventory i = null;
+    try {
+        log.info("DB service "+Thread.currentThread().getId());
+        log.info(""+this.repo);
+        i = this.repo.updateStock(this.order, this.type);
+        
+    } catch (InventoryException e) {
+        log.info("GOT EXCEPTION HERE "+e.getMessage());
+        this.order.setStatus(e.getMessage());
+        //e.printStackTrace();
+    }  finally {
+        log.info("Done "+Thread.currentThread().getId());
+    }   
+    return order;
+}
+/*
     @Override
     public void run() {
         try {
@@ -54,4 +76,5 @@ public class DBService implements Runnable {
             log.info("Done "+Thread.currentThread().getId());
         }      
     }
+*/
 }
