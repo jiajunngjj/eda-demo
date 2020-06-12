@@ -108,6 +108,25 @@ done
 
 
 
+/run.sh 100 http://192.168.0.110:8080  Burger Jay 1
+
+echo 'run' $1 'times'
+echo $2
+echo $3
+url=$2
+product=$3
+cust=$4
+qty=$5
+for value in $(eval echo {1..$1});  \
+do
+    echo $value; 
+    curl -X POST -H 'Content-type: application/json' -d '{"product": "'$product'","qty":"'$qty'","customer":"'$cust'","email": "'$cust'@b.com","address":"","id":"'$cust$value'-'$(date +"%T")'"}' $url/rest/orders/submit; 
+    echo; 
+done
+
+
+===============================
+
 db.Inventory.find( { _id: "Sushi" } )
 
 db.Inventory.update( { _id: "Sushi" }, {$set: {stock: 10}} )
@@ -210,3 +229,9 @@ curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2
 curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com/console/jolokia/read/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-error!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-error!%22/MessagesAcknowledged'
 
 curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2.example.opentlc.com/console/jolokia/read/org.apache.activemq.artemis:broker=!%22amq-broker!%22,component=addresses,address=!%22order-error!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-error!%22/MessagesAdded'
+
+
+
+//clear queue
+//new order
+curl http://192.168.0.110:8161/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22demobroker!%22,component=addresses,address=!%22order-new!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-new!%22/resetMessagesAcknowledged()

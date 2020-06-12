@@ -6,12 +6,14 @@ import java.util.concurrent.Executors;
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.event.Observes;
 import javax.inject.Inject;
+import javax.jms.Connection;
 import javax.jms.ConnectionFactory;
 import javax.jms.JMSConsumer;
 import javax.jms.JMSContext;
 import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageListener;
+import javax.jms.Queue;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 
@@ -22,59 +24,70 @@ import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 
 @ApplicationScoped
-public class ErrorMessageConsumer implements Runnable, MessageListener{
+public class NewOrderMessageConsumer implements Runnable, MessageListener{
     @Inject
     ConnectionFactory connectionFactory;
 
-    @Inject
-    InventoryService inventoryService;
 
-    private final ExecutorService scheduler = Executors.newSingleThreadExecutor();
-    
+    public NewOrderMessageConsumer() {
+        log.info("CONSTRUCTOR "+this.connectionFactory);
+    }
+
+    //private final ExecutorService scheduler = Executors.newSingleThreadExecutor();
+    private final ExecutorService scheduler = Executors.newFixedThreadPool(50);
     void onStart(@Observes StartupEvent ev) {
+        log.info("Onstart "+this.connectionFactory);
+        context = connectionFactory.createContext(Session.SESSION_TRANSACTED);
         scheduler.submit(this);
+        
+        
     }
 
     void onStop(@Observes ShutdownEvent ev) {
         scheduler.shutdown();
     }
-
-
-
-    Logger log = LoggerFactory.getLogger(this.getClass());
+    @Inject
+    InventoryService inventoryService;
 
 
     @Override
     public void onMessage(Message message) {
         String json;
 		try {
+            log.info(" inside "+Thread.currentThread().getId()+"-"+(++cnt));
+
             log.info("message "+((TextMessage)message).getText());
             json = ((TextMessage)message).getText();
-            this.inventoryService.processError(json);
+            
+            log.info("Integration Service "+inventoryService);            
+            this.inventoryService.processNewOrder(json);    
+            log.info("called service");
+            
 
-        } 
-        catch (InventoryException ex) {
-            log.info("Inventory Exception "+ex);
-        }         
-        catch (JMSException e) {
+        }       
+        catch (Exception e) {
 			e.printStackTrace();
         }   
     }
-
+    private JMSContext context ;
+    int cnt = 0;
+    Logger log = LoggerFactory.getLogger(this.getClass());
     @Override
     public void run() {
-        try (JMSContext context = connectionFactory.createContext(Session.SESSION_TRANSACTED)) 
+        try  
         {
-            JMSConsumer errorOrder = context.createConsumer(context.createQueue("order-error-inv"));
-
+            JMSConsumer newOrder = context.createConsumer(context.createQueue("order-new"));
             while(true) {
+                //log.info(" inside consumer "+Thread.currentThread().getId()+"-"+(cnt++));
                 Thread.sleep(500);
-
-            errorOrder.setMessageListener(this);
+            newOrder.setMessageListener(this);
+            
             context.commit();
             }
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            context.close();
         }
     }
 }
