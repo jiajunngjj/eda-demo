@@ -4,15 +4,21 @@ var App = {
     },
     clickSubmit: function() {
         var formData = {};
-        //does not work for checkbox and radios
+        var order = {};
         $.each($('#form1').serializeArray(), function() {
             formData[this.name] = this.value;
         });
         //formData["id"] = "order-"+Math.floor(Math.random() * 100000000)+"-"+formData["email"];
         formData["id"] = "ord-"+Math.floor(Math.random() * 10000);
-        console.log(JSON.stringify(formData));   
-        //alert(JSON.stringify(formData));
-
+        order["id"] = formData["id"];
+        order["product"] = {};
+        order["customer"] = {};
+        order["product"]["id"] = formData["product"];
+        order["customer"]["id"] = formData["customer"];
+        order["customer"]["address"] = formData["address"];
+        order["qty"] = formData["qty"];
+        order["status"] = "NEW";
+        console.log("order "+JSON.stringify(order));
         //submit form
         $.ajax({
             method: "POST",
@@ -28,18 +34,5 @@ var App = {
               //$('#status').html("Order submitted: "+msg);
             });        
 
-    }, stream:function() {
-      console.log("here");
-            //submit form
-            $.ajax({
-              method: "GET",
-              url: "./stream"
-            })
-              .done(function( msg ) {
-                console.log( "received: " + msg );
-                $('#status0').html("123");
-                //return msg;
-              });  
     }
-
 };

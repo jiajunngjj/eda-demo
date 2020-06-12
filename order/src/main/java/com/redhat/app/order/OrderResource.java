@@ -39,6 +39,7 @@ public class OrderResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Order submit(Order order) {
+        log.info("Order Service ===="+order);
         return orderService.newOrder(order);
     }
 

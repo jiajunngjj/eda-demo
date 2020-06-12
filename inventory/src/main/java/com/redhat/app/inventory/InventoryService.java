@@ -136,6 +136,8 @@ public class InventoryService {
 
             i.setStock(Integer.valueOf(i.getStock().intValue() - order.getQty().intValue()));
             i.update();
+
+
             log.info("*********Updating Inventory normal flow :"+(InventoryService.normalInventoryUpdate+=1));
             if (i.getName().equals("Sushi")) {
                 log.info("*********Updating Inventory normal flow sushi:"+(InventoryService.sushicount+=1)+"**"+i.getName()+":"+i.getStock());

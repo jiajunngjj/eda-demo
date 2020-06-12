@@ -52,8 +52,9 @@ router.get('/stream', function(req,res,next){
 } );
 router.post('/submit', function(req, res, next) {
   console.log(req.body);
-  console.log(req.body.orderId);
-
+  console.log(req.body.product);
+  console.log(req.body.id);
+  
   var post_options = {
       host: process.env.BACKEND_URL || "192.168.0.110",
       port: process.env.BACKEND_PORT || "8080",
@@ -63,7 +64,7 @@ router.post('/submit', function(req, res, next) {
           "Content-Type": "application/json"
       }
   };
-
+  console.log(post_options.host);
   var post_req = http.request(post_options, function(post_res) {
       post_res.setEncoding("utf8");
       post_res.on('data', function (chunk) {
@@ -77,5 +78,6 @@ router.post('/submit', function(req, res, next) {
 
   post_req.write(JSON.stringify(req.body));
   post_req.end();
+
 });
 module.exports = router;
