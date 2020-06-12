@@ -1,6 +1,8 @@
 package com.redhat.app.inventory;
 
 import javax.enterprise.context.ApplicationScoped;
+import javax.enterprise.context.control.ActivateRequestContext;
+import javax.inject.Named;
 import javax.persistence.LockModeType;
 import javax.transaction.Transactional;
 
@@ -9,6 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import io.quarkus.hibernate.orm.panache.PanacheRepository;
 @ApplicationScoped
+@ActivateRequestContext
 public class InventoryRepository implements PanacheRepository<Inventory>{
  
 

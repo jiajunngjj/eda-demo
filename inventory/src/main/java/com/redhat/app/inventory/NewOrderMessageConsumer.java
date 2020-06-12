@@ -38,7 +38,7 @@ public class NewOrderMessageConsumer implements Runnable, MessageListener{
     void onStart(@Observes StartupEvent ev) {
         log.info("Onstart "+this.connectionFactory);
         context = connectionFactory.createContext(Session.SESSION_TRANSACTED);
-        scheduler.submit(this);
+        //scheduler.submit(this);
         
         
     }
@@ -80,7 +80,7 @@ public class NewOrderMessageConsumer implements Runnable, MessageListener{
             newOrder = context.createConsumer(context.createQueue("order-new"));
             while(true) {
                 //log.info(" inside consumer "+Thread.currentThread().getId()+"-"+(cnt++));
-                newOrder.setMessageListener(this);
+                //newOrder.setMessageListener(this);
 
                 Thread.sleep(500);
             context.commit();

@@ -11,6 +11,7 @@ import javax.transaction.Transactional;
 
 import com.google.gson.Gson;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
@@ -29,6 +30,8 @@ public class InventoryService {
     InventoryRepository repo;
 
 
+    //amqp
+    /*
     @Inject
     @Named("InProgressSender")
     MessageSender inprogressSender ;
@@ -36,6 +39,7 @@ public class InventoryService {
     @Inject
     @Named("ErrorOrderSender")
     MessageSender errorOrderSender;
+    */
     //For debugging , to be removed
     static int incomingError = 0;
     static int revertingCount = 0;
@@ -43,27 +47,31 @@ public class InventoryService {
     static int sushicount =0;
     static int bugercount =0;
 
+    //private final ExecutorService scheduler = Executors.newSingleThreadExecutor();
+    private final ExecutorService scheduler = Executors.newFixedThreadPool(10);
 
 
-    //@Inject
-    //@Channel("order-in-progress")//in-progress-order
+    private final Object lock = new Object();
+    //reactive
+    @Inject
+    @Channel("order-in-progress")//in-progress-order
     //@OnOverflow(value=OnOverflow.Strategy.BUFFER, bufferSize=512)                
     //@OnOverflow(OnOverflow.Strategy.LATEST)
-    //@OnOverflow(OnOverflow.Strategy.UNBOUNDED_BUFFER)
-    //Emitter<String> inprogressEmitter;
+    @OnOverflow(OnOverflow.Strategy.UNBOUNDED_BUFFER)
+    Emitter<String> inprogressEmitter;
         
-    //@Inject
-    //@Channel("order-error")
+    @Inject
+    @Channel("order-error")
     //@OnOverflow(value=OnOverflow.Strategy.BUFFER, bufferSize=512)                
     //@OnOverflow(OnOverflow.Strategy.LATEST)                
-    //@OnOverflow(OnOverflow.Strategy.UNBOUNDED_BUFFER)
-    //Emitter<String> errorEmitter;  
+    @OnOverflow(OnOverflow.Strategy.UNBOUNDED_BUFFER)
+    Emitter<String> errorEmitter;  
 
     //Possible incomeing usecase : NEW
     //Outgoing : INVENTORY_UPDATED, INNVENTORY_INSUFFICIENT_STOCK
 
     @Transactional
-    //@Incoming("order-new")
+    @Incoming("order-new")
     public Order processNewOrder(String json) {
         //simulate processing inventory
         
@@ -72,11 +80,12 @@ public class InventoryService {
         try {
 
                 
-                updateInventory(order);
+                updateInventory(order,-1,repo);
                 order.setStatus("INVENTORY_UPDATED");
                 json = gson.toJson(order);
 
-                inprogressSender.send(json);
+                inprogressEmitter.send(json);
+                //inprogressSender.send(json);
                 
 
         //} catch (InventoryException e) {
@@ -87,7 +96,8 @@ public class InventoryService {
             json = gson.toJson(order);
             
 
-            errorOrderSender.send(json);
+            //errorOrderSender.send(json);
+            errorEmitter.send(json);
         }
 
         return order;
@@ -97,7 +107,7 @@ public class InventoryService {
     //receive errors related to inventory, for now only handle insufficient stock
     //flow ends here, we may want to return a message to orderservice
     
-    //@Incoming("order-error-inv")
+    @Incoming("order-error-inv")
     @Transactional
     public void processError(String json) throws InventoryException{
         log.info("*******INCOMING INV ERROR ----- "+json);
@@ -118,10 +128,8 @@ public class InventoryService {
             log.info("detected Error in order txn: "+order.getId()+" , reverting inventory");
             
            
-            Inventory i = repo.updateStock(order,1);
-            order.setStatus("INVENTORY_REVERTED ");
-            log.info("************Reverting inventory "+(InventoryService.revertingCount+=1));
-            log.info("*************"+i.getName()+":"+i.getStock());            
+            updateInventory(order,1,repo).setStatus("INVENTORY_REVERTED ");
+     
             
         }    
 
@@ -133,17 +141,30 @@ public class InventoryService {
 
 
     @Transactional
-     private Order updateInventory(Order order) throws InventoryException{
+     private Order updateInventory(Order order, int type, InventoryRepository repo) throws InventoryException{
+        synchronized(lock) {
 
-            Inventory i = repo.updateStock(order,-1);
-            log.info("stock after update:"+i.getName()+":"+i.getName());
-        
-            log.info("*********Updating Inventory normal flow :"+(InventoryService.normalInventoryUpdate+=1));
-            if (i.getName().equals("Sushi")) {
-                log.info("*********Updating Inventory normal flow sushi:"+(InventoryService.sushicount+=1)+"**"+i.getName()+":"+i.getStock());
-            }else {
-                log.info("*********Updating Inventory normal flow burger  :"+(InventoryService.bugercount+=1)+"**"+i.getName()+":"+i.getStock());                
-            }
-        return order;
+                scheduler.execute(new DBService(order, type, repo));
+
+                /*
+                Inventory i = repo.updateStock(order,type);
+
+                log.info("stock after update:"+i.getName()+":"+i.getName());
+            
+                if(type >0) {
+                    log.info("*********Updating Inventory normal flow :"+(InventoryService.normalInventoryUpdate+=1));
+                    if (i.getName().equals("Sushi")) {
+                        log.info("*********Updating Inventory normal flow sushi:"+(InventoryService.sushicount+=1)+"**"+i.getName()+":"+i.getStock());
+                    }else {
+                        log.info("*********Updating Inventory normal flow burger  :"+(InventoryService.bugercount+=1)+"**"+i.getName()+":"+i.getStock());                
+                    }
+                } else {
+                    log.info("************Reverting inventory "+(InventoryService.revertingCount+=1));
+                    log.info("*************"+i.getName()+":"+i.getStock());       
+
+                }
+                */
+            return order;
+        }
     }
 }

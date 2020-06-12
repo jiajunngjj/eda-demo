@@ -9,6 +9,7 @@ import javax.enterprise.event.Observes;
 import javax.inject.Inject;
 import javax.transaction.Transactional;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,6 +24,8 @@ public class StartUpBean {
     @Inject
     InventoryRepository repo;
 
+    @ConfigProperty(name = "db.remove.when.shutdown") 
+    String dbRenove;
     @Transactional
     void onStart(@Observes StartupEvent ev) {    
         log.info("starting up....");
@@ -44,15 +47,18 @@ public class StartUpBean {
         inv3.setPrice(2.5D);
         inv3.setStock(1000);
         
-        repo.persist(inv1);
-        repo.persist(inv2);
-        repo.persist(inv3);
-
+        if (repo.findAll().list().size() == 0) {
+            repo.persist(inv1);
+            repo.persist(inv2);
+            repo.persist(inv3);
+        }
     }
     @Transactional
     void shutdown(@Observes ShutdownEvent ev) {
         log.info("shutdown");
-        repo.deleteAll();
+        if (Boolean.parseBoolean(dbRenove)) {
+            repo.deleteAll();
+        }
         //Inventory.dropTable(client).onItem().apply(deleted -> deleted);
     }
 }

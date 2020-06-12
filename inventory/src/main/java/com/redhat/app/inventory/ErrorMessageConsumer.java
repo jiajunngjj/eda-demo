@@ -33,7 +33,7 @@ public class ErrorMessageConsumer implements Runnable, MessageListener{
     
     void onStart(@Observes StartupEvent ev) {
         context = connectionFactory.createContext(Session.SESSION_TRANSACTED);
-        scheduler.submit(this);
+        //scheduler.submit(this);
     }
 
     void onStop(@Observes ShutdownEvent ev) {
@@ -70,7 +70,7 @@ public class ErrorMessageConsumer implements Runnable, MessageListener{
             errorOrder = context.createConsumer(context.createQueue("order-error-inv"));
 
             while(true) {
-                errorOrder.setMessageListener(this);
+                //errorOrder.setMessageListener(this);
 
                 Thread.sleep(500);
 
