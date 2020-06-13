@@ -9,6 +9,8 @@ import javax.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.quarkus.hibernate.orm.panache.PanacheRepository;
+
 @ApplicationScoped
 @ActivateRequestContext
 public class InventoryRepository implements PanacheRepository<Inventory>{
@@ -37,5 +39,5 @@ public class InventoryRepository implements PanacheRepository<Inventory>{
         return i;
 
     }
-*/
+
 }
