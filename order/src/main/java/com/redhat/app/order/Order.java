@@ -7,6 +7,7 @@ import lombok.Data;
 
 @Data
 public class Order {
+
     String id;
     String customer;
     String product;
@@ -18,8 +19,10 @@ public class Order {
     InventoryStatus inventoryStatus=InventoryStatus.NEW;
     String paymentStatus="NEW";
     /**
-    Product product;
-    Customer customer;
-    Integer qty;
+     Product product;
+     Customer customer;
+     Integer qty;
     */
+
+
 }

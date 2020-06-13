@@ -7,4 +7,5 @@ public class Customer {
     String id;
     String name;
     String email;
+    String Address;
 }

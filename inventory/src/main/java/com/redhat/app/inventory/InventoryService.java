@@ -206,7 +206,7 @@ public class InventoryService {
                 log.info("returned from callable "+returnOrder);
                 if (returnOrder.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
                     //errorEmitter.send(gson.toJson(returnOrder));
-                    log.info("returned from callable "+returnOrder);
+                    log.info("Not enough stocks..... "+returnOrder);
                     throw new InventoryException("INVENTORY_INSUFFICIENT_STOCK");
                 }
             return returnOrder;
