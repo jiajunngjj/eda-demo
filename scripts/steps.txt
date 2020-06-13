@@ -239,3 +239,41 @@ curl 'http://admin:admin@ex-aao-hdls-svc-eda-demo.apps.cluster-sgp-75d2.sgp-75d2
 //clear queue
 //new order
 curl http://192.168.0.110:8161/console/jolokia/exec/org.apache.activemq.artemis:broker=!%22demobroker!%22,component=addresses,address=!%22order-new!%22,subcomponent=queues,routing-type=!%22anycast!%22,queue=!%22order-new!%22/resetMessagesAcknowledged()
+
+
+//queue
+     <addresses>
+         <address name="DLQ">
+            <anycast>
+               <queue name="DLQ" />
+            </anycast>
+         </address>
+         <address name="ExpiryQueue">
+            <anycast>
+               <queue name="ExpiryQueue" />
+            </anycast>
+         </address>
+
+         <address name="order-new">
+            <anycast>
+               <queue name="order-new" />
+            </anycast>
+         </address>
+
+         <address name="order-in-progress">
+            <anycast>
+               <queue name="order-in-progress" />
+            </anycast>
+         </address>
+         <address name="order-error">
+            <anycast>
+               <queue name="order-error" />
+            </anycast>
+         </address>
+         <address name="order-error-inv">
+            <anycast>
+               <queue name="order-error-inv" />
+            </anycast>
+         </address>
+
+      </addresses>

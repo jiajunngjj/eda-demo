@@ -50,7 +50,7 @@ public class OrderService {
     Gson gson = new Gson();
     Map<String,String> returnStatus = new HashMap<String,String>();
     
-    static int outgoingError = 0;
+    
     List<Transaction> txList = new ArrayList<Transaction>();
 
     void onStart(@Observes StartupEvent event) {
@@ -84,7 +84,6 @@ public class OrderService {
             log.info("****IN PROGRESS RECV Cancellation "+json);
             order.setStatus("CANCELLED");
             json = gson.toJson(order);
-            log.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>IN PROCESS");
             updateStreamStatus(json);
 
         }
@@ -100,7 +99,6 @@ public class OrderService {
     @Incoming("order-error")//receive error from other services
     //for now only INVENTORY INSUFFICIENT_STOCK
     public String processError(String json) {
-        log.info("*****************ProcssErrorJSON: "+json);
         Order order = gson.fromJson(json, Order.class);
         log.info("*****************ProcssError: "+order.getStatus());
         //call downstreams services to handle erros also
@@ -144,7 +142,6 @@ public class OrderService {
             //update screen status
             String json = gson.toJson(order);
             try {
-                log.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>CANCEL TX");
                 updateStreamStatus(json);
             } catch (Exception ex) {
                 log.info("***********Cancel Tx:  Error in cancel tx "+ex+" ....ignoring");
@@ -159,6 +156,8 @@ public class OrderService {
     //we should revert the inv here
     public void cancelStaleTransactions(Order order) {
         log.info("INSIDE CANCELSTALETX "+order);
+        boolean errorSent = false;
+        String error = "";
         try {
             Transaction tx = Transaction.findById(order.getId());
             if (!tx.getStatus().equals("COMPLETED")) {
@@ -167,25 +166,29 @@ public class OrderService {
                 if (tx.getOrder().getStatus().equals("INVENTORY_UPDATED") ) {
                     tx.getOrder().setStatus("CANCELLING");
                     tx.setInventoryStatus("CANCELLING");
-                    String error=gson.toJson(tx.getOrder());
+                    error=gson.toJson(tx.getOrder());
                     invErrorEmitter.send(error);
-                    log.info("*******Cancel State Tx: SENT to inv error queue "+error);
-                    log.info("*******COUNT:"+(OrderService.outgoingError+=1));
+                    errorSent = true;
+                    log.info("*******Cancelling transaction due to timeout: sending to inv error queue "+error);
+                    
                     }    
             }
             //}
         //update screen status
-            tx.setStatus("CANCELLED");
-            tx.getOrder().setStatus("CANCELLED");
-            tx.update();
-          
-            String json = gson.toJson(tx.getOrder());
-            //log.info("calling streams update "+json);
-            log.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>CANCEL STALE");
+                tx.setStatus("CANCELLED");
+                tx.getOrder().setStatus("CANCELLED");
+                tx.update();
+            
+                String json = gson.toJson(tx.getOrder());
+                //log.info("calling streams update "+json);
+            
             updateStreamStatus(json);
         } catch (Exception ex) {
-            log.info("*******Cancel Stale Tx: error in cancel stale tx "+ex+" ....ignoring");
-
+            log.info("*******Cancelling transactions due to timeout: error in cancellation stale tx "+ex+" ....retry once");
+            if (!errorSent) {
+                error = gson.toJson(order);
+                invErrorEmitter.send(error);
+            }
         }
     }
 
@@ -218,7 +221,7 @@ public class OrderService {
                         log.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>COMPLETE");
                         updateStreamStatus(json);
                     } catch (Exception ex) {
-                        //log.info("****CompleteTx: error in new order "+ex+" ....ignoring");
+                        log.info("****CompleteTx: error in new order "+ex+" ....ignoring");
                     }
                 } else {
                     //log.info("****CompleteTx: trying to complete a cancelled order");
@@ -249,10 +252,9 @@ public class OrderService {
             tx.persist();
             String json = gson.toJson(order);
             newOrderEmitter.send(json);//send to order-new queue
-            log.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>NEW ORDER");
             updateStreamStatus(json);
         } catch (Exception ex) {
-            //log.info("****New Order: error in new order "+ex+" ....ignoring");
+            log.info("****New Order: error in new order "+ex+" ....ignoring");
             //todo handle error here
         }
         return order;
