@@ -12,10 +12,10 @@
     <maven.compiler.target>11</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <quarkus-plugin.version>1.4.2.Final</quarkus-plugin.version>
+    <quarkus-plugin.version>1.5.0.Final</quarkus-plugin.version>
     <quarkus.platform.artifact-id>quarkus-universe-bom</quarkus.platform.artifact-id>
     <quarkus.platform.group-id>io.quarkus</quarkus.platform.group-id>
-    <quarkus.platform.version>1.4.2.Final</quarkus.platform.version>
+    <quarkus.platform.version>1.5.0.Final</quarkus.platform.version>
     <surefire-plugin.version>2.22.1</surefire-plugin.version>
   </properties>
   <dependencyManagement>
@@ -42,10 +42,33 @@
   <artifactId>gson</artifactId>
   <version>2.8.6</version>
 </dependency>
+  <!-- Hibernate ORM specific dependencies-->
+  <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-hibernate-orm-panache</artifactId>
+  </dependency>
+    <!-- JDBC driver dependencies -->
+
+  <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-jdbc-mysql</artifactId>
+  </dependency>
+  <dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-smallrye-reactive-messaging-amqp</artifactId>
+  </dependency>  
+
 <dependency>
   <groupId>io.quarkus</groupId>
-  <artifactId>quarkus-mongodb-panache</artifactId>
+  <artifactId>quarkus-smallrye-context-propagation</artifactId>
 </dependency>
+
+
+<dependency>
+  <groupId>org.amqphub.quarkus</groupId>
+  <artifactId>quarkus-qpid-jms</artifactId>
+</dependency>
+
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-resteasy</artifactId>
@@ -63,10 +86,6 @@
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-resteasy-jackson</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-smallrye-reactive-messaging-amqp</artifactId>
     </dependency>
   </dependencies>
   <build>

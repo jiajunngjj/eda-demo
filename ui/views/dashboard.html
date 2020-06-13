@@ -136,11 +136,13 @@ $( document ).ready(function() {
   source.onmessage = function (event) {
       //console.log(cnt+ " event");
       //move down
-      while (row!=0) {
+      console.log("new event");
+      while (row>0) {
         $("#status"+row).html($("#status"+(row-1)).html());
-        $("#status0").html(event.data);
+        //$("#status0").html(event.data);
         row--;
       }
+      $("#status0").html(event.data);
       row = rows-1;
 
       status=event.data;

@@ -1,14 +1,24 @@
 package com.redhat.app.inventory;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import javax.enterprise.context.ApplicationScoped;
+import javax.enterprise.context.control.ActivateRequestContext;
+import javax.enterprise.event.Observes;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.transaction.Transactional;
 
 import com.google.gson.Gson;
+
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
@@ -17,83 +27,110 @@ import org.eclipse.microprofile.reactive.messaging.OnOverflow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.quarkus.runtime.ShutdownEvent;
+import io.quarkus.runtime.StartupEvent;
+
+
+
 @ApplicationScoped
+@ActivateRequestContext
 public class InventoryService {
+
+    private static Map<String,List<Order>> records;
     Gson gson = new Gson();
+    Logger log = LoggerFactory.getLogger(this.getClass());
+    @Inject
+    InventoryRepository repo;
 
 
+    //amqp
+    /*
+    @Inject
+    @Named("InProgressSender")
+    MessageSender inprogressSender ;
+
+    @Inject
+    @Named("ErrorOrderSender")
+    MessageSender errorOrderSender;
+    */
+
+
+    //private final ExecutorService scheduler = Executors.newSingleThreadExecutor();
+    private final ExecutorService scheduler = Executors.newFixedThreadPool(10);
+
+
+    private final Object lock = new Object();
+    //reactive
     @Inject
     @Channel("order-in-progress")//in-progress-order
     //@OnOverflow(value=OnOverflow.Strategy.BUFFER, bufferSize=512)                
     //@OnOverflow(OnOverflow.Strategy.LATEST)
     @OnOverflow(OnOverflow.Strategy.UNBOUNDED_BUFFER)
     Emitter<String> inprogressEmitter;
-
+        
     @Inject
     @Channel("order-error")
     //@OnOverflow(value=OnOverflow.Strategy.BUFFER, bufferSize=512)                
     //@OnOverflow(OnOverflow.Strategy.LATEST)                
     @OnOverflow(OnOverflow.Strategy.UNBOUNDED_BUFFER)
-    Emitter<String> errorEmitter;    
+    Emitter<String> errorEmitter;  
 
-    @ConfigProperty(name = "app.error.inventory.id")
-    String injectedError;
-
-    Logger log = LoggerFactory.getLogger(this.getClass());
-    //For debugging , to be removed
-    static int incomingError = 0;
-    static int revertingCount = 0;
-    static int normalInventoryUpdate =0;
-    static int sushicount =0;
-    static int bugercount =0;
-    @Incoming("order-new")
     //Possible incomeing usecase : NEW
     //Outgoing : INVENTORY_UPDATED, INNVENTORY_INSUFFICIENT_STOCK
+
+
+
+    void startUp(@Observes StartupEvent ev) {
+        records = new HashMap<String, List<Order>>();        
+    }
+
+    void shutdown(@Observes ShutdownEvent ev) {
+        this.info();
+    }
+    @Transactional
+    @Incoming("order-new")
     public Order processNewOrder(String json) {
         //simulate processing inventory
         
         Order order = gson.fromJson(json, Order.class);   
-        log.info("*******Received new order "+order);
+        log.info("*******Incoming NEW ORDER "+order);
         try {
-                //Thread.sleep(1000);
-                //simulate delay in processing
-                this.updateInventory(order);
+
+                
+                updateInventory(order,-1,repo);
                 order.setStatus("INVENTORY_UPDATED");
                 json = gson.toJson(order);
-                //log.info("Done updating inventory, sending to in progress emitter "+order);
 
                 inprogressEmitter.send(json);
-    
-           
-		} catch (InventoryException e) {
-            //e.printStackTrace();
-            log.info("Inventory Error captured "+e.getMessage());
-            order.setStatus(e.getMessage()); //Should be insufficient stock        
-            json = gson.toJson(order);
-            //log.info("sending to order error queue "+order);
-            errorEmitter.send(json);
-        } catch (Exception ex) {
-            //for any illegal state exceptions
-            //log.info("Exception "+ex);
-            
-            //resend
-            errorEmitter.send(json);
-        }
+                //inprogressSender.send(json);   
 
-        //catch (InterruptedException e) {
-          //  e.printStackTrace();
-       // } 
+        //} catch (InventoryException e) {
+        } catch (Exception e) {
+            //e.printStackTrace();
+            log.info(e.getMessage()+" NEW ORDER error thrown");
+            order.setStatus(e.getMessage());
+            json = gson.toJson(order);
+            log.info("SENDING TO ERROR "+json);
+            //errorOrderSender.send(json);
+            try {
+            errorEmitter.send(json);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
 
         return order;
     }
 
+
     //receive errors related to inventory, for now only handle insufficient stock
     //flow ends here, we may want to return a message to orderservice
+    
     @Incoming("order-error-inv")
     @Transactional
-    public void processError(String json) {
+    public void processError(String json) throws InventoryException{
         log.info("*******INCOMING INV ERROR ----- "+json);
-        log.info("*******COUNT:"+(InventoryService.incomingError+=1));
+    try{
         Order order = gson.fromJson(json, Order.class);
 
         if (order ==null || order.getStatus()==null) {
@@ -108,50 +145,61 @@ public class InventoryService {
             //dirty hack - simple scenario, add back the reduced qty
             log.info("detected Error in order txn: "+order.getId()+" , reverting inventory");
             
-            //for mongodb
-            Inventory i =Inventory.findById(order.getProduct());
-            i.setStock(i.getStock()+order.getQty());
-            i.update();
-            log.info("************Reverting inventory "+(InventoryService.revertingCount+=1));
-            log.info("*************"+i.getName()+":"+i.getStock());
-            order.setStatus("INVENTORY_REVERTED ");
-            //json = gson.toJson(order);
-            //inprogressEmitter.send(json);
+           
+            updateInventory(order,1,repo).setStatus("INVENTORY_REVERTED ");
+     
+            
         }    
+
+    }catch (Exception ex) {
+        log.info(ex.getMessage()+" Error ORDER error thrown");
+
+        //ex.printStackTrace();
+
+    }
     }   
-    //to update inventory of stock, if qty ordered is higher, throw exception and return exp
-    // to calling method which is process(new order). a message will be returned to orderservice
+
+
+
     @Transactional
-    private Order updateInventory(Order order) throws InventoryException{
-        //mongodb
-        Inventory i =Inventory.findById(order.getProduct());
-        
-        //log.info("find by id "+i);
-    
-        if (i !=null && order.getQty() !=null) {
-            //log.info("---Update inventory with order "+order+"| inv:"+i.getStock());
-            if ( (i.getStock().intValue() < order.getQty().intValue())) {
-                throw new InventoryException("INVENTORY_INSUFFICIENT_STOCK");
-            }
+     private Order updateInventory(Order order, int type, InventoryRepository repo) throws InventoryException, InterruptedException, ExecutionException{
+        synchronized(lock) {
+                if (records.get(order.getStatus()) != null) {
 
-            i.setStock(Integer.valueOf(i.getStock().intValue() - order.getQty().intValue()));
-            i.update();
+                    records.get(order.getStatus()).add(order);
+                } else {
+
+                    records.put(order.getStatus(), new ArrayList<Order>());
+                    records.get(order.getStatus()).add(order);
+
+                }
+
+                //scheduler.execute(new DBService(order, type, repo));
+
+                Future<Order> future = scheduler.submit(new DBService(order, type, repo));
+                Order returnOrder = future.get();
+                log.info("returned from callable "+returnOrder);
+                if (returnOrder.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
+                    //errorEmitter.send(gson.toJson(returnOrder));
+                    log.info("Not enough stocks..... "+returnOrder);
+                    throw new InventoryException("INVENTORY_INSUFFICIENT_STOCK");
+                }
+            return returnOrder;
+        }
+    }
 
 
-            log.info("*********Updating Inventory normal flow :"+(InventoryService.normalInventoryUpdate+=1));
-            if (i.getName().equals("Sushi")) {
-                log.info("*********Updating Inventory normal flow sushi:"+(InventoryService.sushicount+=1)+"**"+i.getName()+":"+i.getStock());
-            }else {
-                log.info("*********Updating Inventory normal flow burger  :"+(InventoryService.bugercount+=1)+"**"+i.getName()+":"+i.getStock());                
-            }
+    public void info() {
+        Iterator<String> itr = InventoryService.records.keySet().iterator();
+
+        while (itr.hasNext()) {
             
-            //log.info("---Updated inventory with order "+order+"| inv:"+i.getStock());
-            //log.info("***********************************************************************************");
-            //log.info("*********"+order.getId()+"****"+i.getStock()+"*************************************");
-            //log.info("***********************************************************************************");
-            
+            String status = itr.next();
+            //log.info(">>>>> Status: "+status);
+            List<Order> orders = records.get(status);
+            log.info(">>>>> Status: "+status+": count "+orders.size());
 
         }
-        return order;
+
     }
 }

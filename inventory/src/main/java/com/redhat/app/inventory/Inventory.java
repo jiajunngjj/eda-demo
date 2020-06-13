@@ -1,13 +1,28 @@
 package com.redhat.app.inventory;
 
-import io.quarkus.mongodb.panache.PanacheMongoEntity;
+
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+
+import io.quarkus.hibernate.orm.panache.PanacheEntity;
+
+
 import lombok.Data;
 
 @Data
-public class Inventory extends PanacheMongoEntity{
-    String id;
+@Entity
+//public class Inventory extends PanacheEntity{
+public class Inventory {
+    @Id
+    @GeneratedValue
+    Long id;
+    String productId;
     String name;
     Double price;
     Integer stock;
-    
+
+
+
 }
