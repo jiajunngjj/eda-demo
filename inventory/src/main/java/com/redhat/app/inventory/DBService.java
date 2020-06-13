@@ -8,6 +8,9 @@ import javax.enterprise.event.Observes;
 import javax.inject.Inject;
 import javax.inject.Named;
 
+import com.redhat.app.inventory.status.InventoryStatus;
+import com.redhat.app.inventory.status.OrderStatus;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +57,10 @@ public Order call() throws Exception {
         
     } catch (InventoryException e) {
         log.info("GOT EXCEPTION HERE "+e.getMessage());
-        this.order.setStatus(e.getMessage());
+
+        //this.order.setStatus(e.getMessage());
+        this.order.setStatus(OrderStatus.ERROR_PROCESSING);
+        this.order.setInventoryStatus(InventoryStatus.NO_STOCK);
         //e.printStackTrace();
     }  finally {
         log.info("Done "+Thread.currentThread().getId());

@@ -1,0 +1,7 @@
+packageName: amq-broker
+channels:
+  - name: alpha
+    currentCSV: amq-broker-operator.v0.9.1
+  - name: current-76
+    currentCSV: amq-broker-operator.v0.13.0
+defaultChannel: current-76

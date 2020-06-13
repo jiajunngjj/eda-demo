@@ -50,7 +50,7 @@ public class OrderChecker {
         PanacheQuery<Transaction> q = Transaction.findAll();
         List<Transaction> txList = q.list();
         for (Transaction transaction : txList) {
-            transaction.setStatus("CANCELLED");
+            //transaction.setStatus("CANCELLED");
             transaction.delete();
         }
     }       

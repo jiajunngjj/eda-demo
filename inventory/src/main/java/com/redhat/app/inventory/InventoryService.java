@@ -18,6 +18,8 @@ import javax.inject.Named;
 import javax.transaction.Transactional;
 
 import com.google.gson.Gson;
+import com.redhat.app.inventory.status.InventoryStatus;
+import com.redhat.app.inventory.status.OrderStatus;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.reactive.messaging.Channel;
@@ -36,7 +38,7 @@ import io.quarkus.runtime.StartupEvent;
 @ActivateRequestContext
 public class InventoryService {
 
-    private static Map<String,List<Order>> records;
+    private static Map<OrderStatus,List<Order>> records;
     Gson gson = new Gson();
     Logger log = LoggerFactory.getLogger(this.getClass());
     @Inject
@@ -81,7 +83,7 @@ public class InventoryService {
 
 
     void startUp(@Observes StartupEvent ev) {
-        records = new HashMap<String, List<Order>>();        
+        records = new HashMap<OrderStatus, List<Order>>();        
     }
 
     void shutdown(@Observes ShutdownEvent ev) {
@@ -94,28 +96,44 @@ public class InventoryService {
         
         Order order = gson.fromJson(json, Order.class);   
         log.info("*******Incoming NEW ORDER "+order);
+        boolean sent=false;
         try {
 
-                
                 updateInventory(order,-1,repo);
-                order.setStatus("INVENTORY_UPDATED");
+                //order.setStatus("INVENTORY_UPDATED");
+                order.setStatus(OrderStatus.IN_PROGRESS);
+                order.setInventoryStatus(InventoryStatus.UPDATED);
                 json = gson.toJson(order);
 
                 inprogressEmitter.send(json);
+                sent=true;
                 //inprogressSender.send(json);   
 
-        //} catch (InventoryException e) {
+        } catch (InventoryException e) {
+            log.info(e.getMessage()+" NEW ORDER error thrown");
+            //order.setStatus(e.getMessage());
+            //order.setInventoryStatus(e.getMessage());
+            order.setInventoryStatus(InventoryStatus.NO_STOCK);
+            json = gson.toJson(order);
+            log.info("SENDING TO ERROR "+json);
         } catch (Exception e) {
             //e.printStackTrace();
             log.info(e.getMessage()+" NEW ORDER error thrown");
-            order.setStatus(e.getMessage());
+            //order.setStatus(e.getMessage());
+            order.setStatus(OrderStatus.ERROR_PROCESSING);
             json = gson.toJson(order);
-            log.info("SENDING TO ERROR "+json);
-            //errorOrderSender.send(json);
-            try {
-            errorEmitter.send(json);
-            } catch (Exception ex) {
-                ex.printStackTrace();
+        }
+        finally {
+            //
+            if (!sent) {
+
+                log.info("SENDING TO ERROR "+json);
+                try {
+                errorEmitter.send(json);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+    
             }
         }
 
@@ -137,7 +155,9 @@ public class InventoryService {
             //log.info("order = null, corrupted data ");
             return;
         } else 
-        if ( order.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
+//        if ( order.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
+        if ( order.getInventoryStatus().equals(InventoryStatus.NO_STOCK)) {
+
             //log.info("Insufficient stock error, nothng to do, did not reduce stock in the first place");
             return;
         }
@@ -146,8 +166,13 @@ public class InventoryService {
             log.info("detected Error in order txn: "+order.getId()+" , reverting inventory");
             
            
-            updateInventory(order,1,repo).setStatus("INVENTORY_REVERTED ");
-     
+            Order o = updateInventory(order,1,repo);
+            //going on where from here, just update for completeness
+            //o.setStatus("INVENTORY_REVERTED ");
+            //o.setInventoryStatus("INVENTORY_REVERTED ");
+            o.setStatus(OrderStatus.CANCELLED);
+            o.setInventoryStatus(InventoryStatus.REVERTED);
+            //
             
         }    
 
@@ -190,11 +215,11 @@ public class InventoryService {
 
 
     public void info() {
-        Iterator<String> itr = InventoryService.records.keySet().iterator();
+        Iterator<OrderStatus> itr = InventoryService.records.keySet().iterator();
 
         while (itr.hasNext()) {
             
-            String status = itr.next();
+            OrderStatus status = itr.next();
             //log.info(">>>>> Status: "+status);
             List<Order> orders = records.get(status);
             log.info(">>>>> Status: "+status+": count "+orders.size());
