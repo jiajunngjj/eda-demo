@@ -204,7 +204,8 @@ public class InventoryService {
                 Future<Order> future = scheduler.submit(new DBService(order, type, repo));
                 Order returnOrder = future.get();
                 log.info("returned from callable "+returnOrder);
-                if (returnOrder.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
+                //if (returnOrder.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
+                    if (returnOrder.getInventoryStatus().equals(InventoryStatus.NO_STOCK)) {
                     //errorEmitter.send(gson.toJson(returnOrder));
                     log.info("Not enough stocks..... "+returnOrder);
                     throw new InventoryException("INVENTORY_INSUFFICIENT_STOCK");

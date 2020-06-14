@@ -10,6 +10,7 @@ import javax.enterprise.event.Observes;
 import javax.inject.Inject;
 
 import com.google.gson.Gson;
+import com.redhat.app.order.status.DeliveryStatus;
 import com.redhat.app.order.status.InventoryStatus;
 import com.redhat.app.order.status.OrderStatus;
 import com.redhat.app.order.status.TransactionStatus;
@@ -36,6 +37,16 @@ public class OrderService {
     //@OnOverflow(OnOverflow.Strategy.LATEST) 
     @Broadcast(value = 0)                          
     Emitter<String> newOrderEmitter;
+
+
+    @Inject
+    @Channel("order-new-delivery")
+    //@OnOverflow(value=OnOverflow.Strategy.BUFFER, bufferSize=512) 
+    @OnOverflow(OnOverflow.Strategy.UNBOUNDED_BUFFER)                    
+    //@OnOverflow(OnOverflow.Strategy.LATEST) 
+    @Broadcast(value = 0)                          
+    Emitter<String> newOrderDeliveryEmitter;
+
     
     @Inject
     @Channel("order-error-inv")
@@ -51,17 +62,18 @@ public class OrderService {
     Emitter<String> statusEmitter;
 
     Gson gson = new Gson();
-    Map<String,String> returnStatus = new HashMap<String,String>();
+    Map<OrderStatus,String> returnStatus = new HashMap<OrderStatus,String>();
     
     
     List<Transaction> txList = new ArrayList<Transaction>();
 
     void onStart(@Observes StartupEvent event) {
         log.info("starting up order service");
-        returnStatus.put("NEW", "ORDER RECEIVED:");
-        returnStatus.put("CANCELLED", "ORDER CANCELLED - Timeout:");
-        returnStatus.put("COMPLETED", "ORDER COMPLETED:");
-        returnStatus.put("INVENTORY_INSUFFICIENT_STOCK", "ORDER CANCELLED - Out of Stock:");
+        returnStatus.put(OrderStatus.NEW, OrderStatus.NEW.label);
+        returnStatus.put(OrderStatus.CANCELLED, OrderStatus.CANCELLED.label);
+        returnStatus.put(OrderStatus.CANCELLED_TIMEOUT, OrderStatus.CANCELLED_TIMEOUT.label);
+        returnStatus.put(OrderStatus.CONFIRMED, OrderStatus.CONFIRMED.label);
+        returnStatus.put(OrderStatus.CANCELLED_NO_STOCK, OrderStatus.CANCELLED_NO_STOCK.label);
 
         //test
         Order order = new Order();
@@ -71,14 +83,15 @@ public class OrderService {
     @Incoming("order-in-progress")//in-progress-order
     //Incoming: INVENTORY_UPDATED
     public String process(String json) {
-        
+        log.info("******Received RAW event from in progress queue: "+json);
         Order order = gson.fromJson(json, Order.class);
-        log.info("Received event from in progress queue: "+order);
+        log.info("******Received event from in progress queue: "+order);
         //simplified
         //put logic to check if all the dependent services are completed.
         // for now, after inventory check is done, we will mark as complete
         boolean allclear = false;
-        if (order.getStatus().equals("INVENTORY_UPDATED")) {
+       // if (order.getStatus().equals("INVENTORY_UPDATED")) {
+        if (order.getInventoryStatus().equals(InventoryStatus.UPDATED)) { 
             Transaction tx = Transaction.findById(order.getId());
             if (tx!=null) {
                 merge(tx,order);
@@ -88,14 +101,20 @@ public class OrderService {
             }
             allclear = true;
         } 
-        else if (order.getStatus().equals("INVENTORY_REVERTED")) {
+        else if (order.getDeliveryStatus().equals(DeliveryStatus.CONFIRMED)) {
+
+        }
+//        else if (order.getStatus().equals("INVENTORY_REVERTED")) {
+        else if (order.getInventoryStatus().equals(InventoryStatus.REVERTED)) {    
             log.info("****IN PROGRESS RECV Cancellation "+json);
             //order.setStatus("CANCELLED");
             order.setStatus(OrderStatus.CANCELLED);
             json = gson.toJson(order);
             updateStreamStatus(json);
-
+            allclear = false;
         }
+
+
 
             //log.info("Completing order "+order);
         if (allclear) {
@@ -116,7 +135,8 @@ public class OrderService {
         // crude, can be refined
         //check that this is a inventory related error, send back to inv-error queue
         //but we are not doing anything there to revert
-        if (order.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
+//        if (order.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
+    if (order.getInventoryStatus().equals(InventoryStatus.NO_STOCK)) {    
             log.info("*******ProcssError: Sending to inventory error queue "+order);
             invErrorEmitter.send(json);
         }
@@ -146,6 +166,8 @@ public class OrderService {
             //tx.setStatus("CANCELLED");
             //TODO i should wait till i get a response from downstream before i cancel
             tx.setStatus(TransactionStatus.CANCELLED);
+            //update status as cancelled
+            tx.getOrder().setStatus(OrderStatus.CANCELLED);
             tx.update();
             //update screen status
             String json = gson.toJson(order);
@@ -173,7 +195,7 @@ public class OrderService {
                 merge(tx,order);
                 //if order status is INV UPDATED, means inventory was committed , need to revert
                 //if (tx.getOrder().getStatus().equals("INVENTORY_UPDATED") ) {
-                    if (tx.getOrder().getInventoryStatus().equals(InventoryStatus.NO_STOCK )) {    
+                    if (tx.getOrder().getInventoryStatus().equals(InventoryStatus.UPDATED )) {    
                     //tx.getOrder().setStatus("CANCELLING");
                     //tx.setInventoryStatus("CANCELLING");
                     tx.getOrder().setStatus(OrderStatus.CANCELLING);
@@ -213,13 +235,16 @@ public class OrderService {
         tx.getOrder().setQty(order.getQty());
         tx.getOrder().setProduct(order.getProduct());
         tx.getOrder().setId(order.getId());
+        tx.getOrder().setInventoryStatus(order.getInventoryStatus());
+        tx.getOrder().setDeliveryStatus(order.getDeliveryStatus());
+        tx.getOrder().setPaymentStatus(order.getPaymentStatus());
     }
     public void completeTransaction(Order order) {
         //log.info("Inside Complete order "+order);
         //order.setStatus("COMPLETED");
         order.setStatus(OrderStatus.CONFIRMED);
         //if (!order.getStatus().equals("CANCELLED")) {
-        if (!order.getStatus().equals(OrderStatus.CANCELLED)) {            
+        if (!(order.getStatus().equals(OrderStatus.CANCELLED) || order.getStatus().equals(OrderStatus.CANCELLED_TIMEOUT) )) {            
             Transaction tx = Transaction.findById(order.getId());
             if (tx!=null) {
                 //check to make sure no race condition updated this guy 
@@ -238,7 +263,6 @@ public class OrderService {
                     String json = gson.toJson(order);
                     try 
                     {
-                        log.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>COMPLETE");
                         updateStreamStatus(json);
                     } catch (Exception ex) {
                         log.info("****CompleteTx: error in new order "+ex+" ....ignoring");
@@ -273,6 +297,7 @@ public class OrderService {
             //if record is not completed, a scheduled  job will cancel it
             tx.persist();
             String json = gson.toJson(order);
+            newOrderDeliveryEmitter.send(json);//send to order-new-delivery queue
             newOrderEmitter.send(json);//send to order-new queue
             updateStreamStatus(json);
         } catch (Exception ex) {
@@ -283,8 +308,11 @@ public class OrderService {
     }
 
     private void updateStreamStatus(String json) {
+        log.info("Emitting raw "+json );
+
         Order order = gson.fromJson(json, Order.class);
-        String status = returnStatus.get(order.getStatus().label)+" "+order.getId();
+        log.info("Emitting order  "+order );
+        String status = returnStatus.get(order.getStatus())+":"+order.getId();
         try {
             //log.info("Emitting "+status );
             statusEmitter.send(status);

@@ -13,9 +13,9 @@ public enum OrderStatus {
     CANCELLED_TIMEOUT("Timeout"),
     @SerializedName("CANCELLED_OUT_OF_STOCK")
     CANCELLED_NO_STOCK("Out Of Stock"),
-    @SerializedName("CANCELLED")
+    @SerializedName("CANCELLING")
     CANCELLING("Cancelling"),
-    @SerializedName("ERROR_PROCESSING(")
+    @SerializedName("ERROR_PROCESSING")
     ERROR_PROCESSING("Error Processing Order"),
     @SerializedName("CONFIRMED")
     CONFIRMED("Confirmed");

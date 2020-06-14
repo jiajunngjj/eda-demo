@@ -12,7 +12,9 @@ public enum InventoryStatus {
     REVERTED("Reverted"),
     @SerializedName("NO_STOCK")
     NO_STOCK("No Stock"),
-    @SerializedName("CONFIRM")
+    @SerializedName("ERROR_PROCESSING")
+    ERROR_PROCESSING("Error Processing Order"),
+    @SerializedName("CONFIRMED")
     CONFIRMED("Confirmed");
     public final String label;
 

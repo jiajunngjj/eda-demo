@@ -1,5 +1,6 @@
 package com.redhat.app.inventory;
 
+import com.redhat.app.inventory.status.DeliveryStatus;
 import com.redhat.app.inventory.status.InventoryStatus;
 import com.redhat.app.inventory.status.OrderStatus;
 
@@ -15,7 +16,7 @@ public class Order {
     Integer qty;
 //    String status;
     OrderStatus status;
-    String deliveryStatus;
+    DeliveryStatus deliveryStatus;
     //String inventoryStatus;
     InventoryStatus inventoryStatus;
     String paymentStatus;    

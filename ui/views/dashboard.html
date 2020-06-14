@@ -136,7 +136,7 @@ $( document ).ready(function() {
   source.onmessage = function (event) {
       //console.log(cnt+ " event");
       //move down
-      console.log("new event");
+      console.log("new event "+event.data);
       while (row>0) {
         $("#status"+row).html($("#status"+(row-1)).html());
         //$("#status0").html(event.data);
@@ -146,21 +146,21 @@ $( document ).ready(function() {
       row = rows-1;
 
       status=event.data;
-      if (status.startsWith("ORDER RECEIVED:")) {
+      if (status.startsWith("New")) {
         
         $("#total").html(++cnt);
       } else  
-      if (status.startsWith("ORDER COMPLETED:")) {
+      if (status.startsWith("Confirmed")) {
         
         $("#completed").html(++completedOrder);
       } else        
-      if (status.startsWith("ORDER CANCELLED - Timeout:")) {
+      if (status.startsWith("Cancelled")) {
         console.log("Cancelled "+status);
 
         $("#failed").html(++failedOrder);
       } 
       else        
-      if (status.startsWith("ORDER CANCELLED - Out of Stock:")) {
+      if (status.startsWith("No Stock:")) {
         $("#outOfStock").html(++outofStockOrder);
       } 
 

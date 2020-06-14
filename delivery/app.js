@@ -38,4 +38,71 @@ app.use(function(err, req, res, next) {
   res.render('error');
 });
 
+
+//Start my amqp listener here
+var container = require('rhea');
+var deliveryService = require('./business/delivery');
+
+const amqpOptions = {
+  'host': '192.168.0.110', 
+  'port': 7672,
+  'username': 'admin',
+  'password': 'admin'
+}
+
+container.on("sender_open", function (event) {
+  console.log("SEND: Opened sender for target address '" +
+              event.sender.target.address + "'");
+});
+
+container.on("receiver_open", function (event) {
+  console.log("RECEIVE: Opened receiver for source address '" +
+              event.receiver.source.address + "'");
+});
+
+container.on('message', function (event) {
+  console.log("RECV DELIVERY EVENT");
+  console.log(event.message.body);
+
+  var result=  deliveryService.process(event.message.body);
+  console.log(result);
+  send(JSON.stringify(result));
+  //event.connection.close();
+});
+
+container.on("sendable", function (event) {
+  var message = {
+      body: messageBody
+  };
+
+  event.sender.send(message);
+
+  console.log("SEND: Sent message '" + message.body + "'");
+
+  event.sender.close();
+  event.connection.close();
+});
+
+container.on('accepted', function (event) {
+  console.log('all messages confirmed');
+  event.connection.close();
+
+});
+container.on('disconnected', function (event) {
+  if (event.error) console.error('%s %j', event.error, event.error);
+});
+
+
+var connection = container.connect(amqpOptions);
+connection.open_receiver('order-new-delivery');
+
+
+
+var messageBody="";
+function send(msg) {
+  messageBody = msg;
+  connection.open_sender('order-in-progress');
+}
+
+
 module.exports = app;
