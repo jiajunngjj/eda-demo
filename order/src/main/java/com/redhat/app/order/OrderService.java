@@ -4,17 +4,28 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import javax.enterprise.context.ApplicationScoped;
+import javax.enterprise.context.control.ActivateRequestContext;
 import javax.enterprise.event.Observes;
 import javax.inject.Inject;
 
 import com.google.gson.Gson;
+import com.mongodb.DB;
+import com.mongodb.MongoClient;
+import com.mongodb.MongoClientURI;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
 import com.redhat.app.order.status.DeliveryStatus;
 import com.redhat.app.order.status.InventoryStatus;
 import com.redhat.app.order.status.OrderStatus;
 import com.redhat.app.order.status.TransactionStatus;
 
+import org.bson.Document;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
@@ -27,7 +38,13 @@ import io.quarkus.runtime.StartupEvent;
 import io.smallrye.reactive.messaging.annotations.Broadcast;
 
 @ApplicationScoped
+@ActivateRequestContext
 public class OrderService {
+
+    private final ExecutorService scheduler = Executors.newFixedThreadPool(10);
+
+    @Inject
+    TransactionRepository repo;
 
     Logger log = LoggerFactory.getLogger(this.getClass());
     @Inject
@@ -74,37 +91,33 @@ public class OrderService {
         returnStatus.put(OrderStatus.CANCELLED_TIMEOUT, OrderStatus.CANCELLED_TIMEOUT.label);
         returnStatus.put(OrderStatus.CONFIRMED, OrderStatus.CONFIRMED.label);
         returnStatus.put(OrderStatus.CANCELLED_NO_STOCK, OrderStatus.CANCELLED_NO_STOCK.label);
-
-        //test
-        Order order = new Order();
-        order.setId("1234");
-        log.info(gson.toJson(order));
     }
     @Incoming("order-in-progress")//in-progress-order
     //Incoming: INVENTORY_UPDATED
     public String process(String json) {
-        log.info("******Received RAW event from in progress queue: "+json);
         Order order = gson.fromJson(json, Order.class);
-        log.info("******Received event from in progress queue: "+order);
-        //simplified
-        //put logic to check if all the dependent services are completed.
-        // for now, after inventory check is done, we will mark as complete
         boolean allclear = false;
-       // if (order.getStatus().equals("INVENTORY_UPDATED")) {
         if (order.getInventoryStatus().equals(InventoryStatus.UPDATED)) { 
-            Transaction tx = Transaction.findById(order.getId());
-            if (tx!=null) {
-                merge(tx,order);
-                //tx.setInventoryStatus("COMPLETED");
-                tx.getOrder().setInventoryStatus(InventoryStatus.CONFIRMED);
-                tx.update();
-            }
-            allclear = true;
+            try {
+                 if (scheduler.submit(new TransactionDBService("INVENTORY", order, repo)).get().isOrderComplete()) {
+                    allclear = true;
+                 }
+
+			} catch (InterruptedException | ExecutionException e) {
+				e.printStackTrace();
+			}  
+            
         } 
         else if (order.getDeliveryStatus().equals(DeliveryStatus.CONFIRMED)) {
+            try {
+				if (scheduler.submit(new TransactionDBService("DELIVERY", order, repo)).get().isOrderComplete()) {
+				    allclear = true;
+				 }
+			} catch (InterruptedException | ExecutionException e) {
+				e.printStackTrace();
+			}
 
         }
-//        else if (order.getStatus().equals("INVENTORY_REVERTED")) {
         else if (order.getInventoryStatus().equals(InventoryStatus.REVERTED)) {    
             log.info("****IN PROGRESS RECV Cancellation "+json);
             //order.setStatus("CANCELLED");
@@ -114,9 +127,6 @@ public class OrderService {
             allclear = false;
         }
 
-
-
-            //log.info("Completing order "+order);
         if (allclear) {
             this.completeTransaction(order);
         }   
@@ -131,12 +141,7 @@ public class OrderService {
         log.info("*****************ProcssError: "+order.getStatus());
         //call downstreams services to handle erros also
         json = gson.toJson(order);
-        //consolidate all error messages, and send to individual queues, 
-        // crude, can be refined
-        //check that this is a inventory related error, send back to inv-error queue
-        //but we are not doing anything there to revert
-//        if (order.getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
-    if (order.getInventoryStatus().equals(InventoryStatus.NO_STOCK)) {    
+        if (order.getInventoryStatus().equals(InventoryStatus.NO_STOCK)) {    
             log.info("*******ProcssError: Sending to inventory error queue "+order);
             invErrorEmitter.send(json);
         }
@@ -148,36 +153,25 @@ public class OrderService {
 
     //outgoing CANCELLING
     public void cancelTransactions(Order order) {
-        Transaction tx = Transaction.findById(order.getId());
-        if (tx!=null) {
-            merge(tx,order);    
+        
+        if (order.getInventoryStatus().equals(InventoryStatus.NO_STOCK)) {
+            order.setStatus(OrderStatus.CANCELLING);
+            //no change to inventory status
+            String error=gson.toJson(order);
+            log.info("*****Cancel Tx: sending to inv error queue "+error);
+            invErrorEmitter.send(error);
+        }
 
-//                if (!tx.getOrder().getStatus().equals("INVENTORY_INSUFFICIENT_STOCK")) {
-                if (!tx.getOrder().getInventoryStatus().equals(InventoryStatus.NO_STOCK)) {
-                    //tx.getOrder().setStatus("CANCELLING");
-                    //tx.setInventoryStatus("CANCELLING");
-                    tx.getOrder().setStatus(OrderStatus.CANCELLING);
-                    //no change to inventory status
-                    String error=gson.toJson(tx.getOrder());
-                    log.info("*****Cancel Tx: sending to inv error queue "+error);
-                    invErrorEmitter.send(error);
-                }
-
-            //tx.setStatus("CANCELLED");
-            //TODO i should wait till i get a response from downstream before i cancel
-            tx.setStatus(TransactionStatus.CANCELLED);
-            //update status as cancelled
-            tx.getOrder().setStatus(OrderStatus.CANCELLED);
-            tx.update();
+        try {
+            Transaction tx = scheduler.submit(new TransactionDBService("CANCEL", order, repo)).get();
+            log.info("CANCELLED "+tx.getId());
             //update screen status
-            String json = gson.toJson(order);
-            try {
+            String json = gson.toJson(tx.getOrder());
                 updateStreamStatus(json);
-            } catch (Exception ex) {
-                log.info("***********Cancel Tx:  Error in cancel tx "+ex+" ....ignoring");
-    
-            }
-         }
+        } catch (Exception ex) {
+            log.info("***********Cancel Tx:  Error in cancel tx "+ex+" ....ignoring");
+
+        }
     }
 
     //called by cron job
@@ -189,43 +183,29 @@ public class OrderService {
         boolean errorSent = false;
         String error = "";
         try {
-            Transaction tx = Transaction.findById(order.getId());
-            //if (!tx.getStatus().equals("COMPLETED")) {
-                if (!tx.getStatus().equals(TransactionStatus.COMPLETED)) {    
-                merge(tx,order);
-                //if order status is INV UPDATED, means inventory was committed , need to revert
-                //if (tx.getOrder().getStatus().equals("INVENTORY_UPDATED") ) {
-                    if (tx.getOrder().getInventoryStatus().equals(InventoryStatus.UPDATED )) {    
-                    //tx.getOrder().setStatus("CANCELLING");
-                    //tx.setInventoryStatus("CANCELLING");
-                    tx.getOrder().setStatus(OrderStatus.CANCELLING);
-                    //no change to inventory status
-                    error=gson.toJson(tx.getOrder());
-                    invErrorEmitter.send(error);
-                    errorSent = true;
-                    log.info("*******Cancelling transaction due to timeout: sending to inv error queue "+error);
-                    
-                    }    
-            }
-            //}
-        //update screen status
-            //tx.setStatus("CANCELLED");
-            //tx.getOrder().setStatus("CANCELLED");
-            //TODO i should wait till i get a response from downstream before i cancel
-            tx.setStatus(TransactionStatus.CANCELLED);
-            tx.getOrder().setStatus(OrderStatus.CANCELLED);
-            tx.update();
+            if (order.getInventoryStatus().equals(InventoryStatus.UPDATED )) {    
+                order.setStatus(OrderStatus.CANCELLING);
+                //no change to inventory status
+                error=gson.toJson(order);
+                invErrorEmitter.send(error);
+                errorSent = true;
+                log.info("*******Cancelling committed inventory transaction due to timeout: sending to inv error queue "+error);
+            }    
+            
+            Transaction tx = scheduler.submit(new TransactionDBService("CANCEL", order, repo)).get();            
             String json = gson.toJson(tx.getOrder());
+            log.info("cancelled stale order "+tx.getId());
             //log.info("calling streams update "+json);
             updateStreamStatus(json);
-        } catch (Exception ex) {
-            log.info("*******Cancelling transactions due to timeout: error in cancellation stale tx "+ex+" ....retry once");
-            if (!errorSent) {
-                error = gson.toJson(order);
-                invErrorEmitter.send(error);
+            } catch (Exception ex) {
+                log.info("*******Cancelling transactions due to timeout: error in cancellation stale tx "+ex+" ....retry once");
+                if (!errorSent) {
+                    error = gson.toJson(order);
+                    invErrorEmitter.send(error);
+                }
             }
-        }
     }
+
 
     private void merge(Transaction tx, Order order) {
         tx.getOrder().setCustomer(order.getCustomer());
@@ -244,34 +224,21 @@ public class OrderService {
         //order.setStatus("COMPLETED");
         order.setStatus(OrderStatus.CONFIRMED);
         //if (!order.getStatus().equals("CANCELLED")) {
-        if (!(order.getStatus().equals(OrderStatus.CANCELLED) || order.getStatus().equals(OrderStatus.CANCELLED_TIMEOUT) )) {            
-            Transaction tx = Transaction.findById(order.getId());
-            if (tx!=null) {
-                //check to make sure no race condition updated this guy 
-                //if (!tx.getStatus().equals("CANCELLED")) {
-                if (!tx.getStatus().equals(OrderStatus.CANCELLED)) {                    
-                    //transfer order status to tx
-                    merge(tx,order);
-                    //tx.setStatus("COMPLETED");
-//                    tx.setInventoryStatus("COMPLETED");
-                    //tx.setStatus(OrderStatus.CONFIRMED);
-                    tx.setStatus(TransactionStatus.COMPLETED);
-                    tx.getOrder().setStatus(OrderStatus.CONFIRMED);
-                    tx.getOrder().setInventoryStatus(InventoryStatus.CONFIRMED);
-                    tx.update();
-                    //log.info("Updating stream "+order);
-                    String json = gson.toJson(order);
-                    try 
-                    {
-                        updateStreamStatus(json);
-                    } catch (Exception ex) {
-                        log.info("****CompleteTx: error in new order "+ex+" ....ignoring");
-                    }
-                } else {
-                    //log.info("****CompleteTx: trying to complete a cancelled order");
-                }
-            }//if not cancelled    
+        if (!(order.getStatus().equals(OrderStatus.CANCELLED) || order.getStatus().equals(OrderStatus.CANCELLED_TIMEOUT) )) {     
+
+            try 
+            {
+                Transaction tx = scheduler.submit(new TransactionDBService("COMPLETE", order, repo)).get();
+                log.info("Completed "+tx.getOrder());
+                String json = gson.toJson(tx.getOrder());
+                    updateStreamStatus(json);
+            } catch (Exception ex) {
+                log.info("****CompleteTx: error in new order "+ex+" ....ignoring");
+            }
+        } else {
+            log.info("****CompleteTx: trying to complete a cancelled order");
         }
+                
 
     }
 
@@ -288,14 +255,9 @@ public class OrderService {
                 order.setId( Math.floor(Math.random() * 100000 )+"-"+order.getEmail() );
             }
             //create transaction
-            
-            Transaction tx = new Transaction();
-            tx.setId(order.getId());
-            tx.setOrder(order);        
-            log.info("tx id: "+tx.getId());
-            //save a transaction record in mongodb, have a 10s job to check , 
-            //if record is not completed, a scheduled  job will cancel it
-            tx.persist();
+            Future<Transaction> future = scheduler.submit(new TransactionDBService( "",order, repo));
+            Transaction tx = future.get();
+            log.info("created new tx "+tx.getId());                       
             String json = gson.toJson(order);
             newOrderDeliveryEmitter.send(json);//send to order-new-delivery queue
             newOrderEmitter.send(json);//send to order-new queue
