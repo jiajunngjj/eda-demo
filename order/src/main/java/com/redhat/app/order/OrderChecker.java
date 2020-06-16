@@ -5,6 +5,7 @@ import java.util.List;
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.event.Observes;
 import javax.inject.Inject;
+import javax.transaction.Transactional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,11 +28,13 @@ public class OrderChecker {
     void checkOrder() {
         log.info("checking for stale orders....");
         List<Transaction> txList = repo.getIncompleteTransactions();
+
         log.info("***************************found stale tx "+txList.size());
         
     }
 
     //delete transaction records
+    @Transactional
     void onStop(@Observes ShutdownEvent ev) {               
         log.info("The application is stopping...");
         

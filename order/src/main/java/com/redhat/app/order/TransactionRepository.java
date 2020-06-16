@@ -1,5 +1,6 @@
 package com.redhat.app.order;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -31,11 +32,19 @@ public class TransactionRepository implements PanacheRepository<Transaction> {
     public List<Transaction> getIncompleteTransactions() {
         List<Transaction> list = find("status", TransactionStatus.NEW).withLock(LockModeType.PESSIMISTIC_WRITE).list();
         log.info("found "+list.size()+" transactions for processing");
+        //List<Order> revertInventory= new ArrayList<Order);
         for (Transaction transaction : list) {
             if (System.currentTimeMillis() - transaction.getDate().getTime() > 5000 ) {
              try {
-                   orderService.cancelStaleTransactions(transaction.getOrder());
-                    
+                   //orderService.cancelStaleTransactions(transaction.getOrder());
+                   transaction.setStatus(TransactionStatus.CANCELLED);
+                   if (transaction.getOrder().getInventoryStatus().equals(InventoryStatus.UPDATED) || transaction.getOrder().getInventoryStatus().equals(InventoryStatus.CONFIRMED) ) {
+                       //revertInventory.add(transaction.getOrder());
+                        orderService.revertInventory(transaction.getOrder());
+                   }
+                   transaction.getOrder().setStatus(OrderStatus.CANCELLED);
+                   orderService.sendCancelStatus(transaction.getOrder());
+                   this.persistAndFlush(transaction);
                 } catch (IllegalStateException ex) {
                     log.info("illegal stateexception thrown while checking order, ignoring");
                     //orderService.cancelStaleTransactions(transaction.getOrder());
@@ -44,7 +53,6 @@ public class TransactionRepository implements PanacheRepository<Transaction> {
                     //orderService.cancelStaleTransactions(transaction.getOrder());
                 }
             }
-            this.persistAndFlush(transaction);
         }//for        
         return list; 
     }

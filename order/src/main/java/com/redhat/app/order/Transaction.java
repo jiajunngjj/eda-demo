@@ -31,8 +31,9 @@ public class Transaction {
     */
     Boolean isOrderComplete() {
         if (
-            order.getStatus().equals(OrderStatus.CONFIRMED)
-            && order.getInventoryStatus().equals(InventoryStatus.CONFIRMED)
+            //order.getStatus().equals(OrderStatus.CONFIRMED)
+            //&& 
+            order.getInventoryStatus().equals(InventoryStatus.UPDATED)
         
         ) {
             return Boolean.TRUE;

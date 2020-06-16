@@ -99,6 +99,8 @@ public class OrderService {
         boolean allclear = false;
         if (order.getInventoryStatus().equals(InventoryStatus.UPDATED)) { 
             try {
+                log.info("****IN PROGRESS 1 "+json);
+
                  if (scheduler.submit(new TransactionDBService("INVENTORY", order, repo)).get().isOrderComplete()) {
                     allclear = true;
                  }
@@ -126,6 +128,7 @@ public class OrderService {
             updateStreamStatus(json);
             allclear = false;
         }
+        log.info("****IN PROGRESS all clear "+allclear);
 
         if (allclear) {
             this.completeTransaction(order);
@@ -192,20 +195,50 @@ public class OrderService {
                 log.info("*******Cancelling committed inventory transaction due to timeout: sending to inv error queue "+error);
             }    
             
-            Transaction tx = scheduler.submit(new TransactionDBService("CANCEL", order, repo)).get();            
-            String json = gson.toJson(tx.getOrder());
-            log.info("cancelled stale order "+tx.getId());
-            //log.info("calling streams update "+json);
-            updateStreamStatus(json);
-            } catch (Exception ex) {
-                log.info("*******Cancelling transactions due to timeout: error in cancellation stale tx "+ex+" ....retry once");
-                if (!errorSent) {
-                    error = gson.toJson(order);
-                    invErrorEmitter.send(error);
+            
+                Transaction tx = scheduler.submit(new TransactionDBService("CANCEL", order, repo)).get();            
+                String json = gson.toJson(tx.getOrder());
+                log.info("cancelled stale order "+tx.getId());
+                //log.info("calling streams update "+json);
+                updateStreamStatus(json);
+                } catch (Exception ex) {
+                    log.info("*******Cancelling transactions due to timeout: error in cancellation stale tx "+ex+" ....retry once");
+                    if (!errorSent) {
+                        error = gson.toJson(order);
+                        invErrorEmitter.send(error);
+                    }
                 }
+    }
+
+    public void sendCancelStatus(Order order) {
+        String error=null;
+
+            order.setStatus(OrderStatus.CANCELLED);
+            //no change to inventory status
+            error=gson.toJson(order);
+            try {
+                updateStreamStatus(error);
+            log.info("*******Cancelling due to time out "+error);            
+            } catch (Exception ex) {
+                log.info("error "+ex);
             }
     }
 
+    
+    public void revertInventory (Order order) {
+        String error=null;
+        
+        order.setStatus(OrderStatus.CANCELLING);
+        //no change to inventory status
+        error=gson.toJson(order);
+        try {
+            invErrorEmitter.send(error);
+        log.info("*******Cancelling committed inventory transaction due to timeout: sending to inv error queue "+error);            
+        } catch (Exception ex) {
+            log.info("error "+ex);
+        }
+    
+    }
 
     private void merge(Transaction tx, Order order) {
         tx.getOrder().setCustomer(order.getCustomer());
