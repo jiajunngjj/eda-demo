@@ -15,15 +15,14 @@ oc create -f scripts/amqp-svc.yml
 oc expose svc ex-aao-hdls-svc
 
 # deploy mysql
-
+//for inventory service
 oc create -f scripts/mysql-ephemeral.yml 
 oc new-app mysql-ephemeral
 
+//for order service
+oc create -f scripts/mysql-order-ephemeral.yml 
+oc new-app mysql-order-ephemeral
 
-# deploy mongodb
-oc create -f scripts/mongodb-ephemeral.yml 
-oc new-app mongodb-ephemeral
-# already predefined with admin:admin]
 
 #deploy inventory service
 cd inventory
@@ -39,8 +38,8 @@ oc new-app --image-stream=inventory:latest
 # To create the route, not needed though
 oc expose service inventory
 
-# Starting the inventory svc instantiate some records in mongodb
-
+//to redeploy
+mvn package;oc start-build inventory --from-dir=.
 
 # deploy order svc
 cd order
@@ -55,14 +54,25 @@ oc new-app --image-stream=order:latest
 # To create the route
 oc expose service order
 
+//to redeploy
+mvn package;oc start-build order --from-dir=.
 
 
-
+//deploy ui
 oc new-app nodejs~https://github.com/jiajunngjj/eda-demo#dev1 --context-dir="/ui" --name=ui --env=BACKEND_URL=order.eda-demo.svc.cluster.local --env=BACKEND_PORT=8080 --env=URL=<route of order service> 
 
 oc expose svc ui
 
 # there is dashboard page <ui route>/dashboard , that shows a real time update of the order status
+
+
+
+=== NOTES ======
+# Starting the inventory svc instantiate some records in mongodb
+# deploy mongodb
+oc create -f scripts/mongodb-ephemeral.yml 
+oc new-app mongodb-ephemeral
+# already predefined with admin:admin]
 
 
 //test, no id will be generated backend

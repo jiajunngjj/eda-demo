@@ -48,11 +48,13 @@
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-smallrye-reactive-messaging-amqp</artifactId>
     </dependency>
+    <!--
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-mongodb-panache</artifactId>
     </dependency>
-  <!-- Hibernate ORM specific dependencies-->
+  -->
+    <!-- Hibernate ORM specific dependencies-->
   <dependency>
     <groupId>io.quarkus</groupId>
     <artifactId>quarkus-hibernate-orm-panache</artifactId>
@@ -69,12 +71,6 @@
       <version>1.18.12</version>
       <scope>provided</scope>
     </dependency>
-<!-- https://mvnrepository.com/artifact/org.mongodb/mongo-java-driver -->
-<dependency>
-  <groupId>org.mongodb</groupId>
-  <artifactId>mongo-java-driver</artifactId>
-  <version>3.12.5</version>
-</dependency>
 
     <dependency>
       <groupId>com.google.code.gson</groupId>

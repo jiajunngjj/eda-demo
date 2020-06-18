@@ -15,17 +15,9 @@ import javax.enterprise.event.Observes;
 import javax.inject.Inject;
 
 import com.google.gson.Gson;
-import com.mongodb.DB;
-import com.mongodb.MongoClient;
-import com.mongodb.MongoClientURI;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
 import com.redhat.app.order.status.DeliveryStatus;
 import com.redhat.app.order.status.InventoryStatus;
 import com.redhat.app.order.status.OrderStatus;
-import com.redhat.app.order.status.TransactionStatus;
-
-import org.bson.Document;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
@@ -56,13 +48,13 @@ public class OrderService {
     Emitter<String> newOrderEmitter;
 
 
-    @Inject
-    @Channel("order-new-delivery")
     //@OnOverflow(value=OnOverflow.Strategy.BUFFER, bufferSize=512) 
-    @OnOverflow(OnOverflow.Strategy.UNBOUNDED_BUFFER)                    
+    //@Inject
+    //@Channel("order-new-delivery")
+    //@OnOverflow(OnOverflow.Strategy.UNBOUNDED_BUFFER)                    
     //@OnOverflow(OnOverflow.Strategy.LATEST) 
-    @Broadcast(value = 0)                          
-    Emitter<String> newOrderDeliveryEmitter;
+    //@Broadcast(value = 0)                          
+    //Emitter<String> newOrderDeliveryEmitter;
 
     
     @Inject
@@ -100,6 +92,7 @@ public class OrderService {
         if (order.getInventoryStatus().equals(InventoryStatus.UPDATED)) { 
             try {
                 log.info("****IN PROGRESS 1 "+json);
+                
 
                  if (scheduler.submit(new TransactionDBService("INVENTORY", order, repo)).get().isOrderComplete()) {
                     allclear = true;
@@ -292,7 +285,7 @@ public class OrderService {
             Transaction tx = future.get();
             log.info("created new tx "+tx.getId());                       
             String json = gson.toJson(order);
-            newOrderDeliveryEmitter.send(json);//send to order-new-delivery queue
+            //newOrderDeliveryEmitter.send(json);//send to order-new-delivery queue
             newOrderEmitter.send(json);//send to order-new queue
             updateStreamStatus(json);
         } catch (Exception ex) {
